@@ -46,7 +46,7 @@ var splash_panel: ColorRect
 
 var combo_tween: Tween 
 
-# BURAYI KENDİ STÜDYONA GÖRE DÜZENLEYEBİLİRSİN
+# STÜDYO BİLGİLERİ
 var studio_name_text := "BONET GAMES" 
 var logo_path := "res://logo.png"
 
@@ -152,35 +152,57 @@ func _show_splash_screen() -> void:
 	tween.tween_property(splash_panel, "modulate:a", 0.0, 1.0).set_trans(Tween.TRANS_SINE)
 	tween.tween_callback(splash_panel.queue_free)
 
+# GÜZELEŞTİRİLMİŞ MODERN GAME OVER VE RESTART BUTONU
 func _build_game_over_panel() -> void:
 	var dim = ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.75)
+	dim.color = Color(0.05, 0.05, 0.1, 0.85) # Şık, koyu arka plan
 	dim.anchor_right = 1.0
 	dim.anchor_bottom = 1.0
 	game_over_panel.add_child(dim)
 
 	var label = Label.new()
-	label.text = "Game Over"
+	label.text = "GAME OVER"
 	label.add_theme_font_size_override("font_size", 56)
-	label.add_theme_color_override("font_color", Color("ffffff"))
-	label.position = Vector2(0, 520)
+	label.add_theme_color_override("font_color", Color("ff4757"))
+	label.position = Vector2(0, 480)
 	label.size = Vector2(720, 70)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	game_over_panel.add_child(label)
 
 	final_score_label = Label.new()
-	final_score_label.add_theme_font_size_override("font_size", 32)
-	final_score_label.add_theme_color_override("font_color", Color("f1c40f"))
-	final_score_label.position = Vector2(0, 600)
+	final_score_label.add_theme_font_size_override("font_size", 36)
+	final_score_label.add_theme_color_override("font_color", Color("ffa502"))
+	final_score_label.position = Vector2(0, 560)
 	final_score_label.size = Vector2(720, 50)
 	final_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	game_over_panel.add_child(final_score_label)
 
+	# Barlas/Modern Stilinde Play Again Butonu
 	var btn = Button.new()
-	btn.text = "Play Again"
-	btn.position = Vector2(260, 690)
-	btn.custom_minimum_size = Vector2(200, 60)
+	btn.text = "PLAY AGAIN"
+	btn.position = Vector2(220, 650)
+	btn.custom_minimum_size = Vector2(280, 70)
+	btn.add_theme_font_size_override("font_size", 28)
+	btn.add_theme_color_override("font_color", Color("ffffff"))
 	btn.pressed.connect(_on_restart)
+	
+	# Butonun Görsel Tasarımı (StyleBoxFlat)
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = Color("2ed573") # Canlı yeşil
+	btn_style.corner_radius_top_left = 20
+	btn_style.corner_radius_top_right = 20
+	btn_style.corner_radius_bottom_left = 20
+	btn_style.corner_radius_bottom_right = 20
+	btn_style.border_width_bottom = 6
+	btn_style.border_color = Color("26af5f") # 3D gömme efekti
+	
+	var btn_hover = btn_style.duplicate()
+	btn_hover.bg_color = Color("26af5f")
+
+	btn.add_theme_stylebox_override("normal", btn_style)
+	btn.add_theme_stylebox_override("hover", btn_hover)
+	btn.add_theme_stylebox_override("pressed", btn_hover)
+
 	game_over_panel.add_child(btn)
 
 func _new_tray() -> void:
@@ -203,12 +225,11 @@ func _new_tray() -> void:
 
 func _on_piece_placed(cleared: int, cells_placed: int) -> void:
 	score += cells_placed 
-	moves_since_last_clear += 1 # Her blok konulduğunda hamle sayısını 1 arttır
+	moves_since_last_clear += 1
 
-	# EĞER SATIR/SÜTUN PATLATILDIYSA
 	if cleared > 0:
 		combo_count += 1
-		moves_since_last_clear = 0 # Patlatma yapıldığı için 5 hamlelik hakkı sıfırla
+		moves_since_last_clear = 0
 		
 		var base_clear_score = cleared * cleared * 10 
 		score += base_clear_score * combo_count
@@ -232,8 +253,6 @@ func _on_piece_placed(cleared: int, cells_placed: int) -> void:
 			combo_tween.tween_property(combo_label, "modulate:a", 0.0, 0.4)
 			combo_tween.tween_callback(func(): combo_label.visible = false)
 	else:
-		# EĞER PATLATMA YAPILAMADIYSA
-		# 5. hamle dolduysa komboyu sıfırla, dolmadıysa kombo hakkı devam eder (sayıyı sıfırlama)
 		if moves_since_last_clear >= 5:
 			combo_count = 0 
 			
@@ -279,7 +298,7 @@ func _on_restart() -> void:
 	game_over_panel.visible = false
 	score = 0
 	combo_count = 0 
-	moves_since_last_clear = 0 # Yeni oyunda sayacı da sıfırla
+	moves_since_last_clear = 0
 	combo_label.visible = false
 	score_label.text = "Score: 0"
 	grid.reset_board()

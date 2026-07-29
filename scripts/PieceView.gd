@@ -23,7 +23,11 @@ func _draw() -> void:
 		return
 	for cell in shape:
 		var r = Rect2(cell.x * cell_size + 2, cell.y * cell_size + 2, cell_size - 6, cell_size - 6)
-		draw_rect(r, color)
+		# ESKİ KOD (YORUMDA):
+		# draw_rect(r, color)
+		
+		# YENİ KOD:
+		_draw_styled_block(r, color)
 
 func _get_drag_data(_at_position: Vector2) -> Variant:
 	if used_flag:
@@ -42,12 +46,44 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 	preview.draw.connect(func():
 		for cell in pv_shape:
 			var r = Rect2(cell.x * pv_cell + 2, cell.y * pv_cell + 2, pv_cell - 6, pv_cell - 6)
-			preview.draw_rect(r, pv_color)
+			# ESKİ KOD (YORUMDA):
+			# preview.draw_rect(r, pv_color)
+			
+			# YENİ KOD (Sürüklerken kavisli gösterir):
+			var style = StyleBoxFlat.new()
+			style.bg_color = pv_color
+			var radius = int(r.size.x * 0.18)
+			style.corner_radius_top_left = radius
+			style.corner_radius_top_right = radius
+			style.corner_radius_bottom_left = radius
+			style.corner_radius_bottom_right = radius
+			style.border_width_top = 3
+			style.border_width_left = 3
+			style.border_width_bottom = 3
+			style.border_width_right = 3
+			style.border_color = pv_color.lightened(0.35)
+			preview.draw_style_box(style, r)
 	)
 	preview.position = -size / 2.0
 	set_drag_preview(preview)
 	modulate.a = 0.3
 	return {"shape": shape, "color": color, "origin": self}
+
+# Yeni stilli blok çizimi
+func _draw_styled_block(rect: Rect2, p_color: Color) -> void:
+	var style = StyleBoxFlat.new()
+	style.bg_color = p_color
+	var radius = int(rect.size.x * 0.18)
+	style.corner_radius_top_left = radius
+	style.corner_radius_top_right = radius
+	style.corner_radius_bottom_left = radius
+	style.corner_radius_bottom_right = radius
+	style.border_width_top = 3
+	style.border_width_left = 3
+	style.border_width_bottom = 3
+	style.border_width_right = 3
+	style.border_color = p_color.lightened(0.35)
+	draw_style_box(style, rect)
 
 func mark_used() -> void:
 	used_flag = true
