@@ -40,7 +40,6 @@ var combo_timer: Timer
 
 var score_label: Label
 var high_score_label: Label
-var combo_label: Label
 var tray_container: Control
 var game_over_panel: Control
 var final_score_label: Label
@@ -58,10 +57,7 @@ var restart_btn: Button
 var main_menu_btn: Button
 var settings_card: Panel
 
-var combo_tween: Tween
-
 var studio_name_text := "BONET GAMES"
-var logo_path := "res://logo.png"
 
 func _ready() -> void:
 	randomize()
@@ -89,7 +85,7 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
-	# SAĞ ÜST AYARLAR BUTONU (OYUN İÇİ)
+	# SAĞ ÜST AYARLAR BUTONU
 	in_game_settings_btn = Button.new()
 	in_game_settings_btn.text = "⚙"
 	in_game_settings_btn.position = Vector2(630, 30)
@@ -130,18 +126,6 @@ func _ready() -> void:
 	high_score_label.add_theme_color_override("font_color", Color("e0e0e0"))
 	high_score_label.position = Vector2(420, 100)
 	add_child(high_score_label)
-	
-	combo_label = Label.new()
-	combo_label.text = "COMBO x1!"
-	combo_label.add_theme_font_size_override("font_size", 32)
-	combo_label.add_theme_color_override("font_color", Color("ff9f43"))
-	combo_label.position = Vector2(0, 130)
-	combo_label.size = Vector2(720, 50)
-	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	combo_label.pivot_offset = combo_label.size / 2.0
-	combo_label.visible = false
-	combo_label.z_index = 50
-	add_child(combo_label)
 
 	grid = GridView.new()
 	grid.position = Vector2(64, 180)
@@ -178,6 +162,64 @@ func _ready() -> void:
 	_build_settings_panel()
 
 	_show_splash_screen()
+
+# SADECE "BONET GAMES" YAZILI ŞIK INTRO EKRANI
+func _show_splash_screen() -> void:
+	splash_panel = ColorRect.new()
+	splash_panel.color = Color("0d0d14")
+	splash_panel.anchor_right = 1.0
+	splash_panel.anchor_bottom = 1.0
+	splash_panel.z_index = 200
+	add_child(splash_panel)
+
+	var st_label = Label.new()
+	st_label.text = studio_name_text
+	st_label.add_theme_font_size_override("font_size", 52)
+	st_label.add_theme_color_override("font_color", Color("ffffff"))
+	st_label.position = Vector2(0, 560)
+	st_label.size = Vector2(720, 80)
+	st_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	st_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	st_label.pivot_offset = Vector2(360, 40)
+	st_label.modulate.a = 0.0
+	st_label.scale = Vector2(0.8, 0.8)
+	splash_panel.add_child(st_label)
+
+	var tween = create_tween().set_parallel(true)
+	tween.tween_property(st_label, "modulate:a", 1.0, 0.6).set_trans(Tween.TRANS_SINE)
+	tween.tween_property(st_label, "scale", Vector2(1.0, 1.0), 0.6).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+	var seq = create_tween()
+	seq.tween_interval(1.4)
+	seq.tween_property(splash_panel, "modulate:a", 0.0, 0.5).set_trans(Tween.TRANS_SINE)
+	seq.tween_callback(splash_panel.queue_free)
+
+# IZGARA ÜZERİNDE DİNAMİK POP-UP KOMBO
+func _show_combo_popup(text: String, spawn_pos: Vector2) -> void:
+	var pop_label = Label.new()
+	pop_label.text = text
+	pop_label.add_theme_font_size_override("font_size", 38)
+	pop_label.add_theme_color_override("font_color", Color("ff9f43"))
+	pop_label.add_theme_color_override("font_outline_color", Color("000000"))
+	pop_label.add_theme_constant_override("outline_size", 6)
+	
+	pop_label.custom_minimum_size = Vector2(300, 60)
+	pop_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pop_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	pop_label.pivot_offset = Vector2(150, 30)
+	pop_label.position = spawn_pos - Vector2(150, 30)
+	pop_label.z_index = 90
+	add_child(pop_label)
+
+	pop_label.scale = Vector2(0.3, 0.3)
+	pop_label.modulate.a = 1.0
+
+	var tween = create_tween().set_parallel(true)
+	tween.tween_property(pop_label, "scale", Vector2(1.3, 1.3), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(pop_label, "position:y", pop_label.position.y - 60.0, 0.6).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(pop_label, "modulate:a", 0.0, 0.6).set_ease(Tween.EASE_IN)
+	
+	tween.chain().tween_callback(pop_label.queue_free)
 
 # ANA MENÜ PANELİ
 func _build_start_menu_panel() -> void:
@@ -311,7 +353,6 @@ func _build_settings_panel() -> void:
 	volume_slider.value_changed.connect(_on_volume_changed)
 	settings_card.add_child(volume_slider)
 
-	# 🔄 YENİDEN BAŞLAT BUTONU (Sadece oyun içinde görünür)
 	restart_btn = Button.new()
 	restart_btn.text = "🔄 YENİDEN BAŞLAT"
 	restart_btn.position = Vector2(110, 205)
@@ -333,7 +374,6 @@ func _build_settings_panel() -> void:
 	restart_btn.add_theme_stylebox_override("pressed", rst_style)
 	settings_card.add_child(restart_btn)
 
-	# 🏠 ANA MENÜYE DÖN BUTONU (Sadece oyun içinde görünür)
 	main_menu_btn = Button.new()
 	main_menu_btn.text = "🏠 ANA MENÜ"
 	main_menu_btn.position = Vector2(110, 275)
@@ -355,7 +395,6 @@ func _build_settings_panel() -> void:
 	main_menu_btn.add_theme_stylebox_override("pressed", menu_style)
 	settings_card.add_child(main_menu_btn)
 
-	# ❌ DEVAM ET / KAPAT BUTONU
 	var close_btn = Button.new()
 	close_btn.text = "KAPAT"
 	close_btn.position = Vector2(160, 345)
@@ -378,7 +417,6 @@ func _build_settings_panel() -> void:
 	close_btn.add_theme_stylebox_override("pressed", close_style)
 	settings_card.add_child(close_btn)
 
-# AYARLARI AÇARKEN OYUN İÇİNDEN Mİ AÇILDIĞINI KONTROL EDER
 func _open_settings(is_in_game: bool = false) -> void:
 	if is_in_game:
 		restart_btn.visible = true
@@ -447,42 +485,6 @@ func save_save_data() -> void:
 
 func _on_combo_timeout() -> void:
 	combo_count = 0
-	if combo_label.visible and not (combo_tween and combo_tween.is_valid()):
-		combo_label.visible = false
-
-func _show_splash_screen() -> void:
-	splash_panel = ColorRect.new()
-	splash_panel.color = Color("0d0d14")
-	splash_panel.anchor_right = 1.0
-	splash_panel.anchor_bottom = 1.0
-	splash_panel.z_index = 200
-	add_child(splash_panel)
-
-	var vbox = VBoxContainer.new()
-	vbox.anchor_right = 1.0
-	vbox.anchor_bottom = 1.0
-	vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-	splash_panel.add_child(vbox)
-
-	if ResourceLoader.exists(logo_path):
-		var logo = TextureRect.new()
-		logo.texture = load(logo_path)
-		logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		logo.custom_minimum_size = Vector2(220, 220)
-		vbox.add_child(logo)
-
-	var st_label = Label.new()
-	st_label.text = studio_name_text
-	st_label.add_theme_font_size_override("font_size", 48)
-	st_label.add_theme_color_override("font_color", Color("ffffff"))
-	st_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	vbox.add_child(st_label)
-
-	var tween = create_tween()
-	tween.tween_interval(1.5)
-	tween.tween_property(splash_panel, "modulate:a", 0.0, 1.0).set_trans(Tween.TRANS_SINE)
-	tween.tween_callback(splash_panel.queue_free)
 
 func _build_game_over_panel() -> void:
 	var dim = ColorRect.new()
@@ -581,20 +583,10 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 		Input.vibrate_handheld(vibration_time)
 		
 		if combo_count >= 1:
-			combo_label.text = "COMBO x%d!" % combo_count
-			combo_label.visible = true
-			combo_label.modulate.a = 1.0
-			
-			if combo_tween and combo_tween.is_valid():
-				combo_tween.kill()
-				
-			combo_tween = create_tween()
-			combo_label.scale = Vector2(1.5, 1.5)
-			
-			combo_tween.tween_property(combo_label, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BOUNCE)
-			combo_tween.tween_interval(0.8)
-			combo_tween.tween_property(combo_label, "modulate:a", 0.0, 0.4)
-			combo_tween.tween_callback(func(): combo_label.visible = false)
+			var combo_text = "COMBO x%d!" % combo_count
+			var random_offset = Vector2(randf_range(100, 412), randf_range(100, 412))
+			var pop_pos = grid.global_position + random_offset
+			_show_combo_popup(combo_text, pop_pos)
 	else:
 		Input.vibrate_handheld(40)
 
@@ -639,7 +631,6 @@ func _on_restart() -> void:
 	score = 0
 	combo_count = 0
 	combo_timer.stop()
-	combo_label.visible = false
 	score_label.text = "Score: 0"
 	grid.reset_board()
 	_new_tray()
