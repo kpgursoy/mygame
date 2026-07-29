@@ -1,0 +1,20 @@
+[gd_scene format=3 uid="uid://b01r8jw0xs36o"]
+
+[ext_resource type="AudioStream" uid="uid://2e78j63j1m4s" path="res://assets/pop2.wav" id="1_3asnw"]
+[ext_resource type="AudioStream" uid="uid://cwhlkl5m68iln" path="res://assets/pop3.wav" id="2_m6ggh"]
+[ext_resource type="AudioStream" uid="uid://crt3ude7cdahl" path="res://assets/pop1.wav" id="3_aoitu"]
+
+[node name="AudioManager" type="Node" unique_id=291269678]
+
+[node name="SfxPickup" type="AudioStreamPlayer" parent="." unique_id=1391596339]
+stream = ExtResource("1_3asnw")
+
+[node name="SfxHover" type="AudioStreamPlayer" parent="." unique_id=873470773]
+stream = ExtResource("2_m6ggh")
+volume_db = -13.426
+max_polyphony = 5
+
+[node name="SfxPlace" type="AudioStreamPlayer" parent="." unique_id=1768864803]
+stream = ExtResource("3_aoitu")
+
+[node name="SfxBlast" type="AudioStreamPlayer" parent="." unique_id=1006276345]

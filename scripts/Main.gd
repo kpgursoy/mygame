@@ -32,9 +32,9 @@ var tray: Array = []
 var score := 0
 var high_score := 0
 
-# YENİ KOMBO SİSTEMİ DEĞİŞKENLERİ
+# YENİ ZAMANLI KOMBO SİSTEMİ
 var combo_count := 0 
-var moves_since_last_clear := 0 # Son patlatmadan beri kaç taş konduğunu sayar
+var combo_timer: Timer
 
 var score_label: Label
 var high_score_label: Label
@@ -46,7 +46,6 @@ var splash_panel: ColorRect
 
 var combo_tween: Tween 
 
-# STÜDYO BİLGİLERİ
 var studio_name_text := "BONET GAMES" 
 var logo_path := "res://logo.png"
 
@@ -60,6 +59,13 @@ func _ready() -> void:
 	bg.anchor_bottom = 1.0
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bg)
+	
+	# ZAMANLAYICIYI OLUŞTUR (8 Saniye)
+	combo_timer = Timer.new()
+	combo_timer.wait_time = 8.0
+	combo_timer.one_shot = true
+	combo_timer.timeout.connect(_on_combo_timeout)
+	add_child(combo_timer)
 
 	var title = Label.new()
 	title.text = "BLOCK BLAST"
@@ -118,6 +124,12 @@ func _ready() -> void:
 	_new_tray()
 	_show_splash_screen()
 
+# 8 Saniye Dolduğunda Çalışır
+func _on_combo_timeout() -> void:
+	combo_count = 0
+	if combo_label.visible and not (combo_tween and combo_tween.is_valid()):
+		combo_label.visible = false
+
 func _show_splash_screen() -> void:
 	splash_panel = ColorRect.new()
 	splash_panel.color = Color("0d0d14") 
@@ -152,10 +164,9 @@ func _show_splash_screen() -> void:
 	tween.tween_property(splash_panel, "modulate:a", 0.0, 1.0).set_trans(Tween.TRANS_SINE)
 	tween.tween_callback(splash_panel.queue_free)
 
-# GÜZELEŞTİRİLMİŞ MODERN GAME OVER VE RESTART BUTONU
 func _build_game_over_panel() -> void:
 	var dim = ColorRect.new()
-	dim.color = Color(0.05, 0.05, 0.1, 0.85) # Şık, koyu arka plan
+	dim.color = Color(0.05, 0.05, 0.1, 0.85)
 	dim.anchor_right = 1.0
 	dim.anchor_bottom = 1.0
 	game_over_panel.add_child(dim)
@@ -177,7 +188,6 @@ func _build_game_over_panel() -> void:
 	final_score_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	game_over_panel.add_child(final_score_label)
 
-	# Barlas/Modern Stilinde Play Again Butonu
 	var btn = Button.new()
 	btn.text = "PLAY AGAIN"
 	btn.position = Vector2(220, 650)
@@ -186,15 +196,14 @@ func _build_game_over_panel() -> void:
 	btn.add_theme_color_override("font_color", Color("ffffff"))
 	btn.pressed.connect(_on_restart)
 	
-	# Butonun Görsel Tasarımı (StyleBoxFlat)
 	var btn_style = StyleBoxFlat.new()
-	btn_style.bg_color = Color("2ed573") # Canlı yeşil
+	btn_style.bg_color = Color("2ed573")
 	btn_style.corner_radius_top_left = 20
 	btn_style.corner_radius_top_right = 20
 	btn_style.corner_radius_bottom_left = 20
 	btn_style.corner_radius_bottom_right = 20
 	btn_style.border_width_bottom = 6
-	btn_style.border_color = Color("26af5f") # 3D gömme efekti
+	btn_style.border_color = Color("26af5f")
 	
 	var btn_hover = btn_style.duplicate()
 	btn_hover.bg_color = Color("26af5f")
@@ -223,16 +232,38 @@ func _new_tray() -> void:
 
 	_check_game_over()
 
-func _on_piece_placed(cleared: int, cells_placed: int) -> void:
-	score += cells_placed 
-	moves_since_last_clear += 1
+# YENİ SİNYALE GÖRE GÜNCELLENMİŞ FONKSİYON
+func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -> void:
+	var total_cleared = rows_cleared + cols_cleared
+	
+	# 1. KURAL: Kombo aktifken koyulan bloklar, kendisi x kombo sayısı kadar puan verir
+	# Kombo 0 ise en azından kendisi kadar (x1) puan versin diye max(1, combo_count) kullanıyoruz
+	var place_multiplier = max(1, combo_count)
+	score += (cells_placed * place_multiplier)
 
-	if cleared > 0:
-		combo_count += 1
-		moves_since_last_clear = 0
+	if total_cleared > 0:
+		# PATLATMA HESAPLAMALARI
+		var added_combo = 0
 		
-		var base_clear_score = cleared * cleared * 10 
+		# Hem satır hem sütun aynı anda patladıysa x4 çarpan!
+		if rows_cleared > 0 and cols_cleared > 0:
+			added_combo = total_cleared * 4
+		# Yoksa sadece patlayan satır/sütun sayısının 2 katı (Örn: 2 satır = +4 kombo)
+		else:
+			added_combo = total_cleared * 2
+			
+		combo_count += added_combo
+		
+		# Zamanlayıcıyı sıfırla ve yeniden başlat (8 Saniye)
+		combo_timer.start()
+		
+		var base_clear_score = total_cleared * total_cleared * 10 
 		score += base_clear_score * combo_count
+		
+		if AudioManager.has_node("SfxBlast"):
+			var blast_sfx = AudioManager.get_node("SfxBlast")
+			blast_sfx.pitch_scale = min(1.0 + (combo_count - 1) * 0.15, 2.0)
+			blast_sfx.play()
 		
 		var vibration_time = min(100 + (combo_count * 30), 250)
 		Input.vibrate_handheld(vibration_time)
@@ -253,12 +284,7 @@ func _on_piece_placed(cleared: int, cells_placed: int) -> void:
 			combo_tween.tween_property(combo_label, "modulate:a", 0.0, 0.4)
 			combo_tween.tween_callback(func(): combo_label.visible = false)
 	else:
-		if moves_since_last_clear >= 5:
-			combo_count = 0 
-			
-			if combo_label.visible and not (combo_tween and combo_tween.is_valid()):
-				combo_label.visible = false
-				
+		# Eğer patlama yoksa sadece hafif titret (Süre arkada akmaya devam ediyor)
 		Input.vibrate_handheld(40)
 
 	score_label.text = "Score: %d" % score
@@ -291,6 +317,8 @@ func _check_game_over() -> void:
 		Input.vibrate_handheld(500) 
 
 func _show_game_over() -> void:
+	# Oyun bittiğinde zamanlayıcıyı durdur
+	combo_timer.stop()
 	final_score_label.text = "Score: %d" % score
 	game_over_panel.visible = true
 
@@ -298,7 +326,7 @@ func _on_restart() -> void:
 	game_over_panel.visible = false
 	score = 0
 	combo_count = 0 
-	moves_since_last_clear = 0
+	combo_timer.stop()
 	combo_label.visible = false
 	score_label.text = "Score: 0"
 	grid.reset_board()

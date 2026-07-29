@@ -1,7 +1,8 @@
 extends Control
 class_name GridView
 
-signal piece_placed(cleared_lines: int, cells_placed: int)
+# GÜNCELLENDİ: Artık satır ve sütun sayıları ayrı ayrı gönderiliyor
+signal piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int)
 
 const GRID_SIZE := 8
 
@@ -63,12 +64,10 @@ func _draw() -> void:
 				# Boş kareler için yuvarlatılmış mat kutu
 				_draw_styled_block(r, Color(0.17, 0.18, 0.23), true)
 
-	# Sürüklerken gösterilen önizleme (yarı saydam siluet)
+	# Sürüklerken gösterilen önizleme (SADECE GEÇERLİ GÖLGE)
 	if hover_cells.size() > 0:
 		var hc = hover_color
-		hc.a = 0.45 if hover_valid else 0.25
-		if not hover_valid:
-			hc = Color(0.9, 0.2, 0.2, 0.35) # Geçersiz yerleşimse şeffaf kırmızı
+		hc.a = 0.45 
 			
 		for cell in hover_cells:
 			if in_bounds(cell.x, cell.y):
@@ -123,11 +122,15 @@ func place(shape: Array, anchor: Vector2i, color: Color) -> void:
 		var y = anchor.y + cell.y
 		board[y][x] = color
 	
-	var cleared = clear_lines()
+	# GÜNCELLENDİ: clear_lines() artık [rows, cols] şeklinde bir Array dönüyor
+	var cleared_data = clear_lines()
 	queue_redraw()
-	piece_placed.emit(cleared, shape.size())
+	
+	# Sinyale satır ve sütun sayıları ayrı ayrı gönderiliyor
+	piece_placed.emit(cleared_data[0], cleared_data[1], shape.size())
 
-func clear_lines() -> int:
+# GÜNCELLENDİ: Dönüş tipi int yerine Array oldu
+func clear_lines() -> Array:
 	var rows_to_clear = []
 	var cols_to_clear = []
 	
@@ -167,7 +170,8 @@ func clear_lines() -> int:
 		# Güçlü Patlama Animasyonu & Parçacıklar
 		_animate_clearing_cells_v2(cells_to_animate, total_cleared)
 		
-	return total_cleared
+	# GÜNCELLENDİ: Satır ve sütun silinme sayılarını ayrı ayrı gönderiyoruz
+	return [rows_to_clear.size(), cols_to_clear.size()]
 
 # GÜÇLÜ PATLAMA & PARÇACIK ANİMASYONU
 func _animate_clearing_cells_v2(cells: Array, intensity: int) -> void:
@@ -248,6 +252,24 @@ func anchor_from_local(pos: Vector2, shape: Array) -> Vector2i:
 	var row = int(round(top_left.y / cell_size))
 	return Vector2i(col, row)
 
+# EKLENEN YENİ FONKSİYON: En yakın geçerli pozisyonu bulur
+func get_closest_valid_anchor(shape: Array, target_anchor: Vector2i) -> Vector2i:
+	var best_anchor = Vector2i(-999, -999)
+	# Miknatis gucu
+	var min_dist = 2.
+
+	for y in range(GRID_SIZE):
+		for x in range(GRID_SIZE):
+			var test_anchor = Vector2i(x, y)
+			
+			if can_place(shape, test_anchor):
+				var dist = Vector2(test_anchor).distance_to(Vector2(target_anchor))
+				if dist < min_dist:
+					min_dist = dist
+					best_anchor = test_anchor
+
+	return best_anchor
+
 func _can_drop_data(pos: Vector2, data: Variant) -> bool:
 	if typeof(data) != TYPE_DICTIONARY or not data.has("shape"):
 		hover_cells = []
@@ -259,29 +281,49 @@ func _can_drop_data(pos: Vector2, data: Variant) -> bool:
 	if data.has("color"):
 		hover_color = data["color"]
 		
-	var anchor = anchor_from_local(pos, shape)
+	# Fare koordinatını alıp en yakın GEÇERLİ yere mıknatıslıyoruz
+	var raw_anchor = anchor_from_local(pos, shape)
+	var best_anchor = get_closest_valid_anchor(shape, raw_anchor)
 	
-	if anchor != last_hover_anchor:
-		last_hover_anchor = anchor
+	# Tahtada blok için hiç geçerli yer yoksa gölgeyi sil
+	if best_anchor == Vector2i(-999, -999):
+		hover_cells = []
+		last_hover_anchor = Vector2i(-999, -999)
+		queue_redraw()
+		return false
+	
+	if best_anchor != last_hover_anchor:
+		last_hover_anchor = best_anchor
 		Input.vibrate_handheld(15)
+		
+		# Kare degisikliginde gezinme sesi knk
+		if AudioManager.has_node("SfxHover"):
+			AudioManager.get_node("SfxHover").play()
 	
-	var valid = can_place(shape, anchor)
-	hover_valid = valid
+	hover_valid = true
 	hover_cells = []
 	for cell in shape:
-		hover_cells.append(Vector2i(anchor.x + cell.x, anchor.y + cell.y))
+		hover_cells.append(Vector2i(best_anchor.x + cell.x, best_anchor.y + cell.y))
 	queue_redraw()
-	return valid
+	return true
 
 func _drop_data(pos: Vector2, data: Variant) -> void:
 	var shape = data["shape"]
 	var color = data["color"]
-	var anchor = anchor_from_local(pos, shape)
+	
+	# Bırakırken de farenin durduğu yeri değil, mıknatısın yapıştığı son yeri alıyoruz
+	var raw_anchor = anchor_from_local(pos, shape)
+	var best_anchor = get_closest_valid_anchor(shape, raw_anchor)
+	
 	hover_cells = []
 	last_hover_anchor = Vector2i(-999, -999)
 	
-	if can_place(shape, anchor):
-		place(shape, anchor, color)
+	if best_anchor != Vector2i(-999, -999):
+		#Blok oturtma sesi
+		if AudioManager.has_node("SfxPlace"):
+			AudioManager.get_node("SfxPlace").play()
+		
+		place(shape, best_anchor, color)
 		if data.has("origin") and is_instance_valid(data["origin"]):
 			data["origin"].mark_used()
 	queue_redraw()

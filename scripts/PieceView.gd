@@ -35,6 +35,9 @@ func _get_drag_data(_at_position: Vector2) -> Variant:
 
 	# Taşı ilk tuttuğunda hissedilen hafif titreşim (30ms)
 	Input.vibrate_handheld(30)
+	
+	# Tutma Sesi 
+	AudioManager.get_node("SfxPickup").play()
 
 	var preview = Control.new()
 	preview.custom_minimum_size = size

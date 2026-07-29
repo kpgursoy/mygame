@@ -18,6 +18,10 @@ config/name="Block Blast"
 run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 
+[autoload]
+
+AudioManager="*uid://b01r8jw0xs36o"
+
 [display]
 
 window/size/viewport_width=720
