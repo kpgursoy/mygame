@@ -31,10 +31,11 @@ var tray: Array = []
 
 var score := 0
 var high_score := 0
-const SAVE_PATH: String = "user://save_data.cfg" # Rekor kayıt dosyası
+var master_volume := 1.0
+const SAVE_PATH: String = "user://save_data.cfg"
 
-# YENİ ZAMANLI KOMBO SİSTEMİ
-var combo_count := 0 
+# ZAMANLI KOMBO SİSTEMİ
+var combo_count := 0
 var combo_timer: Timer
 
 var score_label: Label
@@ -43,11 +44,23 @@ var combo_label: Label
 var tray_container: Control
 var game_over_panel: Control
 var final_score_label: Label
-var splash_panel: ColorRect 
+var splash_panel: ColorRect
 
-var combo_tween: Tween 
+# PANELLER VE BUTONLAR
+var start_menu_panel: Control
+var settings_panel: Control
+var volume_label: Label
+var volume_slider: HSlider
+var in_game_settings_btn: Button
 
-var studio_name_text := "BONET GAMES" 
+# DİNAMİK BUTONLAR
+var restart_btn: Button
+var main_menu_btn: Button
+var settings_card: Panel
+
+var combo_tween: Tween
+
+var studio_name_text := "BONET GAMES"
 var logo_path := "res://logo.png"
 
 func _ready() -> void:
@@ -58,10 +71,9 @@ func _ready() -> void:
 	bg.color = Color("1a1a2e")
 	bg.anchor_right = 1.0
 	bg.anchor_bottom = 1.0
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.mouse_filter = ColorRect.MOUSE_FILTER_IGNORE
 	add_child(bg)
 	
-	# ZAMANLAYICIYI OLUŞTUR (8 Saniye)
 	combo_timer = Timer.new()
 	combo_timer.wait_time = 8.0
 	combo_timer.one_shot = true
@@ -77,6 +89,31 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
+	# SAĞ ÜST AYARLAR BUTONU (OYUN İÇİ)
+	in_game_settings_btn = Button.new()
+	in_game_settings_btn.text = "⚙"
+	in_game_settings_btn.position = Vector2(630, 30)
+	in_game_settings_btn.custom_minimum_size = Vector2(55, 55)
+	in_game_settings_btn.add_theme_font_size_override("font_size", 28)
+	in_game_settings_btn.add_theme_color_override("font_color", Color("ffffff"))
+	in_game_settings_btn.z_index = 80
+	in_game_settings_btn.pressed.connect(func(): _open_settings(true))
+
+	var icon_style = StyleBoxFlat.new()
+	icon_style.bg_color = Color("3a3b5c")
+	icon_style.corner_radius_top_left = 12
+	icon_style.corner_radius_top_right = 12
+	icon_style.corner_radius_bottom_left = 12
+	icon_style.corner_radius_bottom_right = 12
+
+	var icon_hover = icon_style.duplicate()
+	icon_hover.bg_color = Color("2d2e47")
+
+	in_game_settings_btn.add_theme_stylebox_override("normal", icon_style)
+	in_game_settings_btn.add_theme_stylebox_override("hover", icon_hover)
+	in_game_settings_btn.add_theme_stylebox_override("pressed", icon_hover)
+	add_child(in_game_settings_btn)
+
 	score_label = Label.new()
 	score_label.text = "Score: 0"
 	score_label.add_theme_font_size_override("font_size", 28)
@@ -84,26 +121,26 @@ func _ready() -> void:
 	score_label.position = Vector2(40, 100)
 	add_child(score_label)
 
-	# KAYITLI REKORU YÜKLE
-	load_high_score()
+	load_save_data()
+	_apply_volume(master_volume)
 
 	high_score_label = Label.new()
 	high_score_label.text = "Best: %d" % high_score
 	high_score_label.add_theme_font_size_override("font_size", 28)
 	high_score_label.add_theme_color_override("font_color", Color("e0e0e0"))
-	high_score_label.position = Vector2(460, 100)
+	high_score_label.position = Vector2(420, 100)
 	add_child(high_score_label)
 	
 	combo_label = Label.new()
 	combo_label.text = "COMBO x1!"
 	combo_label.add_theme_font_size_override("font_size", 32)
-	combo_label.add_theme_color_override("font_color", Color("ff9f43")) 
+	combo_label.add_theme_color_override("font_color", Color("ff9f43"))
 	combo_label.position = Vector2(0, 130)
 	combo_label.size = Vector2(720, 50)
 	combo_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	combo_label.pivot_offset = combo_label.size / 2.0 
+	combo_label.pivot_offset = combo_label.size / 2.0
 	combo_label.visible = false
-	combo_label.z_index = 50 
+	combo_label.z_index = 50
 	add_child(combo_label)
 
 	grid = GridView.new()
@@ -121,29 +158,293 @@ func _ready() -> void:
 	game_over_panel.visible = false
 	game_over_panel.anchor_right = 1.0
 	game_over_panel.anchor_bottom = 1.0
-	game_over_panel.z_index = 100 
+	game_over_panel.z_index = 100
 	add_child(game_over_panel)
 	_build_game_over_panel()
 
-	_new_tray()
+	start_menu_panel = Control.new()
+	start_menu_panel.anchor_right = 1.0
+	start_menu_panel.anchor_bottom = 1.0
+	start_menu_panel.z_index = 150
+	add_child(start_menu_panel)
+	_build_start_menu_panel()
+
+	settings_panel = Control.new()
+	settings_panel.anchor_right = 1.0
+	settings_panel.anchor_bottom = 1.0
+	settings_panel.z_index = 160
+	settings_panel.visible = false
+	add_child(settings_panel)
+	_build_settings_panel()
+
 	_show_splash_screen()
 
-# REKORU DOSYADAN OKU
-func load_high_score() -> void:
+# ANA MENÜ PANELİ
+func _build_start_menu_panel() -> void:
+	var dim = ColorRect.new()
+	dim.color = Color("1a1a2e")
+	dim.anchor_right = 1.0
+	dim.anchor_bottom = 1.0
+	start_menu_panel.add_child(dim)
+
+	var title_label = Label.new()
+	title_label.text = "BLOCK BLAST"
+	title_label.add_theme_font_size_override("font_size", 54)
+	title_label.add_theme_color_override("font_color", Color("ffffff"))
+	title_label.position = Vector2(0, 360)
+	title_label.size = Vector2(720, 70)
+	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	start_menu_panel.add_child(title_label)
+
+	var menu_best_label = Label.new()
+	menu_best_label.text = "BEST SCORE: %d" % high_score
+	menu_best_label.add_theme_font_size_override("font_size", 32)
+	menu_best_label.add_theme_color_override("font_color", Color("f1c40f"))
+	menu_best_label.position = Vector2(0, 440)
+	menu_best_label.size = Vector2(720, 50)
+	menu_best_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	start_menu_panel.add_child(menu_best_label)
+
+	var play_btn = Button.new()
+	play_btn.text = "PLAY"
+	play_btn.position = Vector2(210, 540)
+	play_btn.custom_minimum_size = Vector2(300, 80)
+	play_btn.add_theme_font_size_override("font_size", 36)
+	play_btn.add_theme_color_override("font_color", Color("ffffff"))
+	play_btn.pressed.connect(_on_start_game_pressed)
+	
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = Color("2ed573")
+	btn_style.corner_radius_top_left = 25
+	btn_style.corner_radius_top_right = 25
+	btn_style.corner_radius_bottom_left = 25
+	btn_style.corner_radius_bottom_right = 25
+	btn_style.border_width_bottom = 8
+	btn_style.border_color = Color("26af5f")
+	
+	var btn_hover = btn_style.duplicate()
+	btn_hover.bg_color = Color("26af5f")
+
+	play_btn.add_theme_stylebox_override("normal", btn_style)
+	play_btn.add_theme_stylebox_override("hover", btn_hover)
+	play_btn.add_theme_stylebox_override("pressed", btn_hover)
+
+	start_menu_panel.add_child(play_btn)
+
+	var settings_btn = Button.new()
+	settings_btn.text = "⚙ AYARLAR"
+	settings_btn.position = Vector2(240, 650)
+	settings_btn.custom_minimum_size = Vector2(240, 65)
+	settings_btn.add_theme_font_size_override("font_size", 26)
+	settings_btn.add_theme_color_override("font_color", Color("ffffff"))
+	settings_btn.pressed.connect(func(): _open_settings(false))
+
+	var set_style = StyleBoxFlat.new()
+	set_style.bg_color = Color("3a3b5c")
+	set_style.corner_radius_top_left = 20
+	set_style.corner_radius_top_right = 20
+	set_style.corner_radius_bottom_left = 20
+	set_style.corner_radius_bottom_right = 20
+	set_style.border_width_bottom = 5
+	set_style.border_color = Color("2d2e47")
+	
+	var set_hover = set_style.duplicate()
+	set_hover.bg_color = Color("2d2e47")
+
+	settings_btn.add_theme_stylebox_override("normal", set_style)
+	settings_btn.add_theme_stylebox_override("hover", set_hover)
+	settings_btn.add_theme_stylebox_override("pressed", set_hover)
+
+	start_menu_panel.add_child(settings_btn)
+
+# AYARLAR PANELİ
+func _build_settings_panel() -> void:
+	var dim = ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.75)
+	dim.anchor_right = 1.0
+	dim.anchor_bottom = 1.0
+	settings_panel.add_child(dim)
+
+	settings_card = Panel.new()
+	settings_card.position = Vector2(100, 300)
+	settings_card.custom_minimum_size = Vector2(520, 420)
+	
+	var card_style = StyleBoxFlat.new()
+	card_style.bg_color = Color("222338")
+	card_style.corner_radius_top_left = 30
+	card_style.corner_radius_top_right = 30
+	card_style.corner_radius_bottom_left = 30
+	card_style.corner_radius_bottom_right = 30
+	card_style.border_width_left = 3
+	card_style.border_width_top = 3
+	card_style.border_width_right = 3
+	card_style.border_width_bottom = 3
+	card_style.border_color = Color("3a3b5c")
+	settings_card.add_theme_stylebox_override("panel", card_style)
+	settings_panel.add_child(settings_card)
+
+	var set_title = Label.new()
+	set_title.text = "AYARLAR"
+	set_title.add_theme_font_size_override("font_size", 38)
+	set_title.add_theme_color_override("font_color", Color("ffffff"))
+	set_title.position = Vector2(0, 25)
+	set_title.size = Vector2(520, 50)
+	set_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	settings_card.add_child(set_title)
+
+	volume_label = Label.new()
+	volume_label.text = "SES DÜZEYİ: %d%%" % int(master_volume * 100)
+	volume_label.add_theme_font_size_override("font_size", 24)
+	volume_label.add_theme_color_override("font_color", Color("f1c40f"))
+	volume_label.position = Vector2(0, 95)
+	volume_label.size = Vector2(520, 35)
+	volume_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	settings_card.add_child(volume_label)
+
+	volume_slider = HSlider.new()
+	volume_slider.min_value = 0.0
+	volume_slider.max_value = 1.0
+	volume_slider.step = 0.01
+	volume_slider.value = master_volume
+	volume_slider.position = Vector2(60, 140)
+	volume_slider.custom_minimum_size = Vector2(400, 40)
+	volume_slider.value_changed.connect(_on_volume_changed)
+	settings_card.add_child(volume_slider)
+
+	# 🔄 YENİDEN BAŞLAT BUTONU (Sadece oyun içinde görünür)
+	restart_btn = Button.new()
+	restart_btn.text = "🔄 YENİDEN BAŞLAT"
+	restart_btn.position = Vector2(110, 205)
+	restart_btn.custom_minimum_size = Vector2(300, 55)
+	restart_btn.add_theme_font_size_override("font_size", 22)
+	restart_btn.add_theme_color_override("font_color", Color("ffffff"))
+	restart_btn.pressed.connect(_on_settings_restart_pressed)
+
+	var rst_style = StyleBoxFlat.new()
+	rst_style.bg_color = Color("e67e22")
+	rst_style.corner_radius_top_left = 16
+	rst_style.corner_radius_top_right = 16
+	rst_style.corner_radius_bottom_left = 16
+	rst_style.corner_radius_bottom_right = 16
+	rst_style.border_width_bottom = 5
+	rst_style.border_color = Color("d35400")
+	restart_btn.add_theme_stylebox_override("normal", rst_style)
+	restart_btn.add_theme_stylebox_override("hover", rst_style)
+	restart_btn.add_theme_stylebox_override("pressed", rst_style)
+	settings_card.add_child(restart_btn)
+
+	# 🏠 ANA MENÜYE DÖN BUTONU (Sadece oyun içinde görünür)
+	main_menu_btn = Button.new()
+	main_menu_btn.text = "🏠 ANA MENÜ"
+	main_menu_btn.position = Vector2(110, 275)
+	main_menu_btn.custom_minimum_size = Vector2(300, 55)
+	main_menu_btn.add_theme_font_size_override("font_size", 22)
+	main_menu_btn.add_theme_color_override("font_color", Color("ffffff"))
+	main_menu_btn.pressed.connect(_on_settings_menu_pressed)
+
+	var menu_style = StyleBoxFlat.new()
+	menu_style.bg_color = Color("2980b9")
+	menu_style.corner_radius_top_left = 16
+	menu_style.corner_radius_top_right = 16
+	menu_style.corner_radius_bottom_left = 16
+	menu_style.corner_radius_bottom_right = 16
+	menu_style.border_width_bottom = 5
+	menu_style.border_color = Color("2980b9").darkened(0.2)
+	main_menu_btn.add_theme_stylebox_override("normal", menu_style)
+	main_menu_btn.add_theme_stylebox_override("hover", menu_style)
+	main_menu_btn.add_theme_stylebox_override("pressed", menu_style)
+	settings_card.add_child(main_menu_btn)
+
+	# ❌ DEVAM ET / KAPAT BUTONU
+	var close_btn = Button.new()
+	close_btn.text = "KAPAT"
+	close_btn.position = Vector2(160, 345)
+	close_btn.custom_minimum_size = Vector2(200, 50)
+	close_btn.add_theme_font_size_override("font_size", 22)
+	close_btn.add_theme_color_override("font_color", Color("ffffff"))
+	close_btn.pressed.connect(_close_settings)
+
+	var close_style = StyleBoxFlat.new()
+	close_style.bg_color = Color("2ed573")
+	close_style.corner_radius_top_left = 16
+	close_style.corner_radius_top_right = 16
+	close_style.corner_radius_bottom_left = 16
+	close_style.corner_radius_bottom_right = 16
+	close_style.border_width_bottom = 5
+	close_style.border_color = Color("26af5f")
+
+	close_btn.add_theme_stylebox_override("normal", close_style)
+	close_btn.add_theme_stylebox_override("hover", close_style)
+	close_btn.add_theme_stylebox_override("pressed", close_style)
+	settings_card.add_child(close_btn)
+
+# AYARLARI AÇARKEN OYUN İÇİNDEN Mİ AÇILDIĞINI KONTROL EDER
+func _open_settings(is_in_game: bool = false) -> void:
+	if is_in_game:
+		restart_btn.visible = true
+		main_menu_btn.visible = true
+		settings_card.custom_minimum_size = Vector2(520, 420)
+		settings_card.position = Vector2(100, 300)
+	else:
+		restart_btn.visible = false
+		main_menu_btn.visible = false
+		settings_card.custom_minimum_size = Vector2(520, 270)
+		settings_card.position = Vector2(100, 370)
+		
+	settings_panel.visible = true
+
+func _close_settings() -> void:
+	settings_panel.visible = false
+
+func _on_settings_restart_pressed() -> void:
+	_close_settings()
+	_on_restart()
+
+func _on_settings_menu_pressed() -> void:
+	_close_settings()
+	_on_restart()
+	start_menu_panel.modulate.a = 1.0
+	start_menu_panel.visible = true
+
+func _on_volume_changed(val: float) -> void:
+	master_volume = val
+	volume_label.text = "SES DÜZEYİ: %d%%" % int(master_volume * 100)
+	_apply_volume(master_volume)
+	save_save_data()
+
+func _apply_volume(val: float) -> void:
+	var bus_index = AudioServer.get_bus_index("Master")
+	if bus_index >= 0:
+		if val <= 0.001:
+			AudioServer.set_bus_mute(bus_index, true)
+		else:
+			AudioServer.set_bus_mute(bus_index, false)
+			var db = linear_to_db(val)
+			AudioServer.set_bus_volume_db(bus_index, db)
+
+func _on_start_game_pressed() -> void:
+	if start_menu_panel:
+		var tween = create_tween()
+		tween.tween_property(start_menu_panel, "modulate:a", 0.0, 0.25)
+		tween.tween_callback(func(): start_menu_panel.visible = false)
+	_new_tray()
+
+func load_save_data() -> void:
 	var config = ConfigFile.new()
 	var err = config.load(SAVE_PATH)
 	if err == OK:
 		high_score = config.get_value("game", "high_score", 0)
+		master_volume = config.get_value("game", "master_volume", 1.0)
 	else:
 		high_score = 0
+		master_volume = 1.0
 
-# REKORU DOSYAYA KAYDET
-func save_high_score() -> void:
+func save_save_data() -> void:
 	var config = ConfigFile.new()
 	config.set_value("game", "high_score", high_score)
+	config.set_value("game", "master_volume", master_volume)
 	config.save(SAVE_PATH)
 
-# 8 Saniye Dolduğunda Çalışır
 func _on_combo_timeout() -> void:
 	combo_count = 0
 	if combo_label.visible and not (combo_tween and combo_tween.is_valid()):
@@ -151,10 +452,10 @@ func _on_combo_timeout() -> void:
 
 func _show_splash_screen() -> void:
 	splash_panel = ColorRect.new()
-	splash_panel.color = Color("0d0d14") 
+	splash_panel.color = Color("0d0d14")
 	splash_panel.anchor_right = 1.0
 	splash_panel.anchor_bottom = 1.0
-	splash_panel.z_index = 200 
+	splash_panel.z_index = 200
 	add_child(splash_panel)
 
 	var vbox = VBoxContainer.new()
@@ -166,9 +467,9 @@ func _show_splash_screen() -> void:
 	if ResourceLoader.exists(logo_path):
 		var logo = TextureRect.new()
 		logo.texture = load(logo_path)
-		logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE 
+		logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		logo.custom_minimum_size = Vector2(220, 220) 
+		logo.custom_minimum_size = Vector2(220, 220)
 		vbox.add_child(logo)
 
 	var st_label = Label.new()
@@ -251,7 +552,6 @@ func _new_tray() -> void:
 
 	_check_game_over()
 
-# YENİ SİNYALE GÖRE GÜNCELLENMİŞ FONKSİYON
 func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -> void:
 	var total_cleared = rows_cleared + cols_cleared
 	
@@ -259,7 +559,6 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 	score += (cells_placed * place_multiplier)
 
 	if total_cleared > 0:
-		# PATLATMA HESAPLAMALARI
 		var added_combo = 0
 		
 		if rows_cleared > 0 and cols_cleared > 0:
@@ -270,7 +569,7 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 		combo_count += added_combo
 		combo_timer.start()
 		
-		var base_clear_score = total_cleared * total_cleared * 10 
+		var base_clear_score = total_cleared * total_cleared * 10
 		score += base_clear_score * combo_count
 		
 		if AudioManager.has_node("SfxBlast"):
@@ -284,13 +583,13 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 		if combo_count >= 1:
 			combo_label.text = "COMBO x%d!" % combo_count
 			combo_label.visible = true
-			combo_label.modulate.a = 1.0 
+			combo_label.modulate.a = 1.0
 			
 			if combo_tween and combo_tween.is_valid():
 				combo_tween.kill()
 				
 			combo_tween = create_tween()
-			combo_label.scale = Vector2(1.5, 1.5) 
+			combo_label.scale = Vector2(1.5, 1.5)
 			
 			combo_tween.tween_property(combo_label, "scale", Vector2(1.0, 1.0), 0.3).set_trans(Tween.TRANS_BOUNCE)
 			combo_tween.tween_interval(0.8)
@@ -301,11 +600,10 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 
 	score_label.text = "Score: %d" % score
 	
-	# REKOR KONTROLÜ VE DOSYAYA KAYDETME
 	if score > high_score:
 		high_score = score
 		high_score_label.text = "Best: %d" % high_score
-		save_high_score()
+		save_save_data()
 
 	await get_tree().process_frame
 
@@ -329,7 +627,7 @@ func _check_game_over() -> void:
 				break
 	if not any_playable:
 		_show_game_over()
-		Input.vibrate_handheld(500) 
+		Input.vibrate_handheld(500)
 
 func _show_game_over() -> void:
 	combo_timer.stop()
@@ -339,7 +637,7 @@ func _show_game_over() -> void:
 func _on_restart() -> void:
 	game_over_panel.visible = false
 	score = 0
-	combo_count = 0 
+	combo_count = 0
 	combo_timer.stop()
 	combo_label.visible = false
 	score_label.text = "Score: 0"
