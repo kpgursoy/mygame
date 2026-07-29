@@ -25,9 +25,12 @@ func _draw() -> void:
 		var r = Rect2(cell.x * cell_size + 2, cell.y * cell_size + 2, cell_size - 6, cell_size - 6)
 		draw_rect(r, color)
 
-func _get_drag_data(_at_position: Vector2):
+func _get_drag_data(_at_position: Vector2) -> Variant:
 	if used_flag:
 		return null
+
+	# Taşı ilk tuttuğunda hissedilen hafif titreşim (30ms)
+	Input.vibrate_handheld(30)
 
 	var preview = Control.new()
 	preview.custom_minimum_size = size

@@ -1,7 +1,7 @@
 extends Control
 class_name GridView
 
-signal piece_placed(cleared_lines: int)
+signal piece_placed(cleared_lines: int, cells_placed: int)
 
 const GRID_SIZE := 8
 
@@ -10,10 +10,19 @@ var board: Array = []
 var hover_cells: Array = []
 var hover_valid := false
 
+# Taşı sürüklerken kare değişimini takip etmek için
+var last_hover_anchor := Vector2i(-999, -999) 
+
 func _ready() -> void:
 	custom_minimum_size = Vector2(GRID_SIZE * cell_size, GRID_SIZE * cell_size)
 	size = custom_minimum_size
 	_init_board()
+	mouse_exited.connect(_on_mouse_exited)
+
+func _on_mouse_exited() -> void:
+	hover_cells.clear()
+	last_hover_anchor = Vector2i(-999, -999) # Dışarı çıkınca sıfırla
+	queue_redraw()
 
 func _init_board() -> void:
 	board.clear()
@@ -27,6 +36,7 @@ func _init_board() -> void:
 func reset_board() -> void:
 	_init_board()
 	hover_cells = []
+	last_hover_anchor = Vector2i(-999, -999)
 	queue_redraw()
 
 func _draw() -> void:
@@ -73,7 +83,7 @@ func place(shape: Array, anchor: Vector2i, color: Color) -> void:
 		board[y][x] = color
 	var cleared = clear_lines()
 	queue_redraw()
-	piece_placed.emit(cleared)
+	piece_placed.emit(cleared, shape.size())
 
 func clear_lines() -> int:
 	var rows_to_clear = []
@@ -115,13 +125,21 @@ func anchor_from_local(pos: Vector2, shape: Array) -> Vector2i:
 	var row = int(round(top_left.y / cell_size))
 	return Vector2i(col, row)
 
-func _can_drop_data(pos, data) -> bool:
+func _can_drop_data(pos: Vector2, data: Variant) -> bool:
 	if typeof(data) != TYPE_DICTIONARY or not data.has("shape"):
 		hover_cells = []
+		last_hover_anchor = Vector2i(-999, -999)
 		queue_redraw()
 		return false
+		
 	var shape = data["shape"]
 	var anchor = anchor_from_local(pos, shape)
+	
+	# EĞER TAŞ YENİ BİR KARENİN ÜSTÜNE GELDİYSE ÇOK HAFİF TİTRET
+	if anchor != last_hover_anchor:
+		last_hover_anchor = anchor
+		Input.vibrate_handheld(15) # Kılcal, tık hissi veren titreşim
+	
 	var valid = can_place(shape, anchor)
 	hover_valid = valid
 	hover_cells = []
@@ -130,11 +148,13 @@ func _can_drop_data(pos, data) -> bool:
 	queue_redraw()
 	return valid
 
-func _drop_data(pos, data) -> void:
+func _drop_data(pos: Vector2, data: Variant) -> void:
 	var shape = data["shape"]
 	var color = data["color"]
 	var anchor = anchor_from_local(pos, shape)
 	hover_cells = []
+	last_hover_anchor = Vector2i(-999, -999) # Bırakınca sıfırla
+	
 	if can_place(shape, anchor):
 		place(shape, anchor, color)
 		if data.has("origin") and is_instance_valid(data["origin"]):
