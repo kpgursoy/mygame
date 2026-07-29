@@ -31,6 +31,7 @@ var tray: Array = []
 
 var score := 0
 var high_score := 0
+const SAVE_PATH: String = "user://save_data.cfg" # Rekor kayıt dosyası
 
 # YENİ ZAMANLI KOMBO SİSTEMİ
 var combo_count := 0 
@@ -83,8 +84,11 @@ func _ready() -> void:
 	score_label.position = Vector2(40, 100)
 	add_child(score_label)
 
+	# KAYITLI REKORU YÜKLE
+	load_high_score()
+
 	high_score_label = Label.new()
-	high_score_label.text = "Best: 0"
+	high_score_label.text = "Best: %d" % high_score
 	high_score_label.add_theme_font_size_override("font_size", 28)
 	high_score_label.add_theme_color_override("font_color", Color("e0e0e0"))
 	high_score_label.position = Vector2(460, 100)
@@ -123,6 +127,21 @@ func _ready() -> void:
 
 	_new_tray()
 	_show_splash_screen()
+
+# REKORU DOSYADAN OKU
+func load_high_score() -> void:
+	var config = ConfigFile.new()
+	var err = config.load(SAVE_PATH)
+	if err == OK:
+		high_score = config.get_value("game", "high_score", 0)
+	else:
+		high_score = 0
+
+# REKORU DOSYAYA KAYDET
+func save_high_score() -> void:
+	var config = ConfigFile.new()
+	config.set_value("game", "high_score", high_score)
+	config.save(SAVE_PATH)
 
 # 8 Saniye Dolduğunda Çalışır
 func _on_combo_timeout() -> void:
@@ -236,8 +255,6 @@ func _new_tray() -> void:
 func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -> void:
 	var total_cleared = rows_cleared + cols_cleared
 	
-	# 1. KURAL: Kombo aktifken koyulan bloklar, kendisi x kombo sayısı kadar puan verir
-	# Kombo 0 ise en azından kendisi kadar (x1) puan versin diye max(1, combo_count) kullanıyoruz
 	var place_multiplier = max(1, combo_count)
 	score += (cells_placed * place_multiplier)
 
@@ -245,16 +262,12 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 		# PATLATMA HESAPLAMALARI
 		var added_combo = 0
 		
-		# Hem satır hem sütun aynı anda patladıysa x4 çarpan!
 		if rows_cleared > 0 and cols_cleared > 0:
 			added_combo = total_cleared * 4
-		# Yoksa sadece patlayan satır/sütun sayısının 2 katı (Örn: 2 satır = +4 kombo)
 		else:
 			added_combo = total_cleared * 2
 			
 		combo_count += added_combo
-		
-		# Zamanlayıcıyı sıfırla ve yeniden başlat (8 Saniye)
 		combo_timer.start()
 		
 		var base_clear_score = total_cleared * total_cleared * 10 
@@ -284,13 +297,15 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 			combo_tween.tween_property(combo_label, "modulate:a", 0.0, 0.4)
 			combo_tween.tween_callback(func(): combo_label.visible = false)
 	else:
-		# Eğer patlama yoksa sadece hafif titret (Süre arkada akmaya devam ediyor)
 		Input.vibrate_handheld(40)
 
 	score_label.text = "Score: %d" % score
+	
+	# REKOR KONTROLÜ VE DOSYAYA KAYDETME
 	if score > high_score:
 		high_score = score
 		high_score_label.text = "Best: %d" % high_score
+		save_high_score()
 
 	await get_tree().process_frame
 
@@ -317,7 +332,6 @@ func _check_game_over() -> void:
 		Input.vibrate_handheld(500) 
 
 func _show_game_over() -> void:
-	# Oyun bittiğinde zamanlayıcıyı durdur
 	combo_timer.stop()
 	final_score_label.text = "Score: %d" % score
 	game_over_panel.visible = true
