@@ -2,6 +2,7 @@ extends Control
 class_name GridView
 
 signal piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int)
+signal cell_clicked_for_joker(cell_pos: Vector2i)
 
 const GRID_SIZE := 8
 
@@ -25,6 +26,13 @@ func _ready() -> void:
 	
 	_init_board()
 	mouse_exited.connect(_on_mouse_exited)
+
+func _gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var col = int(event.position.x / cell_size)
+		var row = int(event.position.y / cell_size)
+		if in_bounds(col, row):
+			cell_clicked_for_joker.emit(Vector2i(col, row))
 
 func _on_mouse_exited() -> void:
 	hover_cells.clear()
@@ -89,6 +97,28 @@ func _draw_styled_block(rect: Rect2, color: Color, is_empty: bool = false) -> vo
 
 func in_bounds(x: int, y: int) -> bool:
 	return x >= 0 and x < GRID_SIZE and y >= 0 and y < GRID_SIZE
+
+# JOKER: TEK KARE KIRMA (HAMMER)
+func use_hammer(cell: Vector2i) -> bool:
+	if in_bounds(cell.x, cell.y) and board[cell.y][cell.x] != null:
+		_animate_clearing_cells_v2([cell], 2)
+		return true
+	return false
+
+# JOKER: 3x3 ALAN PATLATMA (BOMB)
+func use_bomb(center_cell: Vector2i) -> bool:
+	var cells_to_clear: Array = []
+	for dy in range(-1, 2):
+		for dx in range(-1, 2):
+			var cx = center_cell.x + dx
+			var cy = center_cell.y + dy
+			if in_bounds(cx, cy) and board[cy][cx] != null:
+				cells_to_clear.append(Vector2i(cx, cy))
+				
+	if cells_to_clear.size() > 0:
+		_animate_clearing_cells_v2(cells_to_clear, 4)
+		return true
+	return false
 
 func can_place(shape: Array, anchor: Vector2i) -> bool:
 	for cell in shape:
@@ -159,16 +189,22 @@ func clear_lines() -> Array:
 		
 	return [rows_to_clear.size(), cols_to_clear.size()]
 
+func trigger_shake(intensity: int) -> void:
+	var original_pos = position
+	var shake_tween = create_tween()
+	var shake_count = 6 + (intensity * 2)
+	var max_offset = 5.0 + (intensity * 3.0)
+	
+	for i in range(shake_count):
+		var offset = Vector2(randf_range(-max_offset, max_offset), randf_range(-max_offset, max_offset))
+		shake_tween.tween_property(self, "position", original_pos + offset, 0.025)
+	shake_tween.tween_property(self, "position", original_pos, 0.025)
+
 func _animate_clearing_cells_v2(cells: Array, intensity: int) -> void:
 	var anim_container = Node2D.new()
 	add_child(anim_container)
 	
-	var original_pos = position
-	var shake_tween = create_tween()
-	for i in range(5):
-		var offset = Vector2(randf_range(-6, 6), randf_range(-6, 6)) * intensity
-		shake_tween.tween_property(self, "position", original_pos + offset, 0.03)
-	shake_tween.tween_property(self, "position", original_pos, 0.03)
+	trigger_shake(intensity)
 	
 	for cell in cells:
 		var color = board[cell.y][cell.x]
@@ -183,16 +219,16 @@ func _animate_clearing_cells_v2(cells: Array, intensity: int) -> void:
 		particles.position = center_pos
 		particles.emitting = false
 		particles.one_shot = true
-		particles.amount = 14
-		particles.lifetime = 0.4
-		particles.explosiveness = 0.9
+		particles.amount = 16
+		particles.lifetime = 0.45
+		particles.explosiveness = 0.95
 		particles.spread = 180.0
-		particles.gravity = Vector2(0, 400)
-		particles.initial_velocity_min = 100.0
-		particles.initial_velocity_max = 220.0
+		particles.gravity = Vector2(0, 450)
+		particles.initial_velocity_min = 120.0
+		particles.initial_velocity_max = 250.0
 		particles.scale_amount_min = 4.0
-		particles.scale_amount_max = 8.0
-		particles.color = color.lightened(0.2)
+		particles.scale_amount_max = 9.0
+		particles.color = color.lightened(0.25)
 		anim_container.add_child(particles)
 		particles.emitting = true
 		
@@ -212,8 +248,8 @@ func _animate_clearing_cells_v2(cells: Array, intensity: int) -> void:
 		temp_block.queue_redraw()
 		
 		var tween = create_tween().set_parallel(true)
-		tween.tween_property(temp_block, "scale", Vector2(1.35, 1.35), 0.1).set_trans(Tween.TRANS_BACK)
-		tween.tween_property(temp_block, "modulate", Color(2.0, 2.0, 2.0, 0.0), 0.18).set_trans(Tween.TRANS_QUAD)
+		tween.tween_property(temp_block, "scale", Vector2(1.4, 1.4), 0.1).set_trans(Tween.TRANS_BACK)
+		tween.tween_property(temp_block, "modulate", Color(2.5, 2.5, 2.5, 0.0), 0.2).set_trans(Tween.TRANS_QUAD)
 	
 	queue_redraw()
 	
