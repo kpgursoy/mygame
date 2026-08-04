@@ -35,6 +35,11 @@ var gold_amount := 100
 var master_volume := 1.0
 const SAVE_PATH: String = "user://save_data.cfg"
 
+# ELDEKİ JOKER ADETLERİ (ENVANTER)
+var hammer_count := 3
+var bomb_count := 1
+var reroll_count := 2
+
 # KOMBO VE STREAK SİSTEMİ
 var combo_count := 0
 var streak_count := 0
@@ -62,14 +67,21 @@ var hammer_btn: Button
 var bomb_btn: Button
 var reroll_btn: Button
 
+# BEYAZ ROZET SAYAC ETİKETLERİ
+var hammer_badge: Label
+var bomb_badge: Label
+var reroll_badge: Label
+
 # PANELLER VE BUTONLAR
 var start_menu_panel: Control
 var settings_panel: Control
 var quests_panel: Control
+var help_panel: Control
 var volume_label: Label
 var volume_slider: HSlider
 var in_game_settings_btn: Button
 var in_game_quests_btn: Button
+var in_game_help_btn: Button
 
 # GÜNLÜK GÖREV SİSTEMİ
 var last_quest_date := ""
@@ -120,7 +132,7 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
-	# SAĞ ÜST AYARLAR VE GÖREV BUTONLARI
+	# SAĞ ÜST İKON BUTONLARI
 	in_game_settings_btn = _create_icon_button("⚙", Vector2(640, 20))
 	in_game_settings_btn.pressed.connect(func(): _open_settings(true))
 	add_child(in_game_settings_btn)
@@ -129,26 +141,30 @@ func _ready() -> void:
 	in_game_quests_btn.pressed.connect(func(): quests_panel.visible = true)
 	add_child(in_game_quests_btn)
 
+	in_game_help_btn = _create_icon_button("❓", Vector2(510, 20))
+	in_game_help_btn.pressed.connect(func(): help_panel.visible = true)
+	add_child(in_game_help_btn)
+
 	# SKOR, REKOR VE ALTIN PANELLERİ
 	score_label = Label.new()
 	score_label.text = "Score: 0"
 	score_label.add_theme_font_size_override("font_size", 24)
 	score_label.add_theme_color_override("font_color", Color("e0e0e0"))
-	score_label.position = Vector2(40, 85)
+	score_label.position = Vector2(35, 85)
 	add_child(score_label)
 
 	high_score_label = Label.new()
 	high_score_label.text = "Best: %d" % high_score
 	high_score_label.add_theme_font_size_override("font_size", 24)
 	high_score_label.add_theme_color_override("font_color", Color("e0e0e0"))
-	high_score_label.position = Vector2(240, 85)
+	high_score_label.position = Vector2(215, 85)
 	add_child(high_score_label)
 
 	gold_label = Label.new()
 	gold_label.text = "🪙 %d" % gold_amount
 	gold_label.add_theme_font_size_override("font_size", 26)
 	gold_label.add_theme_color_override("font_color", Color("f1c40f"))
-	gold_label.position = Vector2(440, 85)
+	gold_label.position = Vector2(395, 85)
 	add_child(gold_label)
 
 	_apply_volume(master_volume)
@@ -198,6 +214,14 @@ func _ready() -> void:
 	add_child(quests_panel)
 	_build_quests_panel()
 
+	help_panel = Control.new()
+	help_panel.anchor_right = 1.0
+	help_panel.anchor_bottom = 1.0
+	help_panel.z_index = 180
+	help_panel.visible = false
+	add_child(help_panel)
+	_build_help_panel()
+
 	_show_splash_screen()
 
 func _create_icon_button(icon_text: String, pos: Vector2) -> Button:
@@ -224,14 +248,369 @@ func _create_icon_button(icon_text: String, pos: Vector2) -> Button:
 	btn.add_theme_stylebox_override("pressed", hover)
 	return btn
 
-# OYUN İÇİ BİLDİRİM BANNER'I (POP-UP)
+func _build_joker_bar() -> void:
+	joker_bar = HBoxContainer.new()
+	joker_bar.position = Vector2(40, 810)
+	joker_bar.custom_minimum_size = Vector2(640, 70)
+	joker_bar.add_theme_constant_override("separation", 20)
+	add_child(joker_bar)
+
+	hammer_btn = _create_joker_button("🔨", Color("e67e22"))
+	hammer_btn.pressed.connect(func(): _on_joker_pressed(JokerType.HAMMER))
+	joker_bar.add_child(hammer_btn)
+	hammer_badge = _add_badge_to_button(hammer_btn)
+
+	bomb_btn = _create_joker_button("💣", Color("e74c3c"))
+	bomb_btn.pressed.connect(func(): _on_joker_pressed(JokerType.BOMB))
+	joker_bar.add_child(bomb_btn)
+	bomb_badge = _add_badge_to_button(bomb_btn)
+
+	reroll_btn = _create_joker_button("🔄", Color("9b59b6"))
+	reroll_btn.pressed.connect(_on_reroll_pressed)
+	joker_bar.add_child(reroll_btn)
+	reroll_badge = _add_badge_to_button(reroll_btn)
+
+	_update_joker_labels()
+
+func _add_badge_to_button(parent_btn: Button) -> Label:
+	var badge = Label.new()
+	badge.custom_minimum_size = Vector2(36, 28)
+	badge.position = Vector2(150, -8)
+	badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	badge.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	badge.add_theme_font_size_override("font_size", 16)
+	badge.add_theme_color_override("font_color", Color("1a1a2e"))
+	
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color("ffffff")
+	style.corner_radius_top_left = 12
+	style.corner_radius_top_right = 12
+	style.corner_radius_bottom_left = 12
+	style.corner_radius_bottom_right = 12
+	style.border_width_left = 2
+	style.border_width_top = 2
+	style.border_width_right = 2
+	style.border_width_bottom = 2
+	style.border_color = Color("1a1a2e")
+	
+	badge.add_theme_stylebox_override("normal", style)
+	parent_btn.add_child(badge)
+	return badge
+
+func _update_joker_labels() -> void:
+	hammer_badge.text = str(hammer_count)
+	hammer_btn.text = "🔨" if hammer_count > 0 else "+ %d🪙" % COST_HAMMER
+
+	bomb_badge.text = str(bomb_count)
+	bomb_btn.text = "💣" if bomb_count > 0 else "+ %d🪙" % COST_BOMB
+
+	reroll_badge.text = str(reroll_count)
+	reroll_btn.text = "🔄" if reroll_count > 0 else "+ %d🪙" % COST_REROLL
+
+func _create_joker_button(text: String, base_color: Color) -> Button:
+	var btn = Button.new()
+	btn.text = text
+	btn.custom_minimum_size = Vector2(200, 65)
+	btn.add_theme_font_size_override("font_size", 22)
+	btn.add_theme_color_override("font_color", Color.WHITE)
+
+	var style = StyleBoxFlat.new()
+	style.bg_color = base_color
+	style.corner_radius_top_left = 16
+	style.corner_radius_top_right = 16
+	style.corner_radius_bottom_left = 16
+	style.corner_radius_bottom_right = 16
+	style.border_width_bottom = 5
+	style.border_color = base_color.darkened(0.3)
+
+	btn.add_theme_stylebox_override("normal", style)
+	btn.add_theme_stylebox_override("hover", style)
+	btn.add_theme_stylebox_override("pressed", style)
+	return btn
+
+func _on_joker_pressed(type: JokerType) -> void:
+	if type == JokerType.HAMMER:
+		if hammer_count <= 0:
+			_try_buy_joker(JokerType.HAMMER)
+			return
+	elif type == JokerType.BOMB:
+		if bomb_count <= 0:
+			_try_buy_joker(JokerType.BOMB)
+			return
+
+	if active_joker == type:
+		active_joker = JokerType.NONE
+	else:
+		active_joker = type
+	_update_joker_buttons_visual()
+
+func _try_buy_joker(type: JokerType) -> void:
+	var cost := 0
+	if type == JokerType.HAMMER: cost = COST_HAMMER
+	elif type == JokerType.BOMB: cost = COST_BOMB
+	elif type == JokerType.NONE: cost = COST_REROLL
+
+	if gold_amount >= cost:
+		gold_amount -= cost
+		if type == JokerType.HAMMER: hammer_count += 1
+		elif type == JokerType.BOMB: bomb_count += 1
+		elif type == JokerType.NONE: reroll_count += 1
+		
+		_update_gold_display()
+		_update_joker_labels()
+		save_save_data()
+		Input.vibrate_handheld(100)
+	else:
+		_show_not_enough_gold_anim()
+
+func _update_joker_buttons_visual() -> void:
+	hammer_btn.modulate = Color(1.6, 1.6, 1.6) if active_joker == JokerType.HAMMER else Color.WHITE
+	bomb_btn.modulate = Color(1.6, 1.6, 1.6) if active_joker == JokerType.BOMB else Color.WHITE
+
+func _on_cell_clicked_for_joker(cell_pos: Vector2i) -> void:
+	if active_joker == JokerType.NONE:
+		return
+
+	var success := false
+
+	if active_joker == JokerType.HAMMER and hammer_count > 0:
+		if grid.use_hammer(cell_pos):
+			hammer_count -= 1
+			success = true
+	elif active_joker == JokerType.BOMB and bomb_count > 0:
+		if grid.use_bomb(cell_pos):
+			bomb_count -= 1
+			success = true
+
+	if success:
+		_update_joker_labels()
+		_update_quest_progress("use_jokers", 1)
+		save_save_data()
+		Input.vibrate_handheld(150)
+		active_joker = JokerType.NONE
+		_update_joker_buttons_visual()
+		_check_game_over()
+
+func _on_reroll_pressed() -> void:
+	if reroll_count > 0:
+		reroll_count -= 1
+		_update_joker_labels()
+		_update_quest_progress("use_jokers", 1)
+		save_save_data()
+		Input.vibrate_handheld(80)
+		_new_tray()
+	else:
+		_try_buy_joker(JokerType.NONE)
+
+# YENİLENMİŞ YÜKSEK PUAN & TAHTA TEMİZLEME MEKANİĞİ
+func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -> void:
+	var total_cleared = rows_cleared + cols_cleared
+	
+	# 1. Yerleştirilen her tekil kareye 10 puan (Eskiden 1'di)
+	score += (cells_placed * 10)
+	_update_quest_progress("place_blocks", cells_placed)
+
+	if total_cleared > 0:
+		streak_count += 1
+		_update_quest_progress("clear_lines", total_cleared)
+		
+		if streak_count >= 2:
+			_update_quest_progress("do_streaks", 1)
+		
+		var added_combo = total_cleared * 2
+		combo_count += added_combo
+		combo_timer.start()
+		
+		var earned_gold = (total_cleared * 15) + (streak_count * 10)
+		gold_amount += earned_gold
+		_update_gold_display()
+		
+		# 2. Çizgi Başına Taban 250 Puan (Eskiden 100 civarıydı)
+		var base_clear_score = total_cleared * 250
+		score += (base_clear_score * max(1, combo_count)) + (streak_count * 50)
+		
+		if AudioManager.has_node("SfxBlast"):
+			var blast_sfx = AudioManager.get_node("SfxBlast")
+			blast_sfx.pitch_scale = min(1.0 + (combo_count + streak_count - 2) * 0.12, 2.2)
+			blast_sfx.play()
+		
+		var vibration_time = min(100 + (combo_count * 30) + (streak_count * 20), 300)
+		Input.vibrate_handheld(vibration_time)
+		
+		var random_offset = Vector2(randf_range(100, 412), randf_range(100, 412))
+		var pop_pos = grid.global_position + random_offset
+		
+		if streak_count >= 2:
+			_show_combo_popup("STREAK x%d! (+%d🪙)" % [streak_count, earned_gold], pop_pos, true)
+		elif combo_count >= 1:
+			_show_combo_popup("COMBO x%d! (+%d🪙)" % [combo_count, earned_gold], pop_pos, false)
+			
+		# 3. 🧹 FULL TAHTA TEMİZLEME (ALL CLEAR) KONTROLÜ
+		if _is_board_completely_empty():
+			score += 500
+			gold_amount += 50
+			_update_gold_display()
+			_show_combo_popup("ALL CLEAR! +500 PTS (+50🪙)", grid.global_position + Vector2(256, 256), true)
+			Input.vibrate_handheld(400)
+	else:
+		streak_count = 0
+		Input.vibrate_handheld(40)
+
+	score_label.text = "Score: %d" % score
+	_update_quest_progress("reach_score", score, true)
+	
+	if score > high_score:
+		high_score = score
+		high_score_label.text = "Best: %d" % high_score
+	
+	save_save_data()
+
+	await get_tree().process_frame
+
+	var all_used = true
+	for p in tray:
+		if is_instance_valid(p) and not p.used_flag:
+			all_used = false
+			break
+
+	if all_used:
+		_new_tray()
+	else:
+		_check_game_over()
+
+# TAHTADA HİÇ BLOK KALDI MI KONTROL EDEN FONKSİYON
+func _is_board_completely_empty() -> bool:
+	if not grid or not ("grid_data" in grid): return false
+	for r in range(grid.GRID_SIZE):
+		for c in range(grid.GRID_SIZE):
+			if grid.grid_data[r][c] != null:
+				return false
+	return true
+
+func load_save_data() -> void:
+	var config = ConfigFile.new()
+	var err = config.load(SAVE_PATH)
+	if err == OK:
+		high_score = config.get_value("game", "high_score", 0)
+		gold_amount = config.get_value("game", "gold_amount", 100)
+		master_volume = config.get_value("game", "master_volume", 1.0)
+		hammer_count = config.get_value("jokers", "hammer_count", 3)
+		bomb_count = config.get_value("jokers", "bomb_count", 1)
+		reroll_count = config.get_value("jokers", "reroll_count", 2)
+		last_quest_date = config.get_value("quests", "last_quest_date", "")
+		daily_quests = config.get_value("quests", "daily_quests", [])
+	else:
+		high_score = 0
+		gold_amount = 100
+		master_volume = 1.0
+		hammer_count = 3
+		bomb_count = 1
+		reroll_count = 2
+		last_quest_date = ""
+		daily_quests = []
+
+func save_save_data() -> void:
+	var config = ConfigFile.new()
+	config.set_value("game", "high_score", high_score)
+	config.set_value("game", "gold_amount", gold_amount)
+	config.set_value("game", "master_volume", master_volume)
+	config.set_value("jokers", "hammer_count", hammer_count)
+	config.set_value("jokers", "bomb_count", bomb_count)
+	config.set_value("jokers", "reroll_count", reroll_count)
+	config.set_value("quests", "last_quest_date", last_quest_date)
+	config.set_value("quests", "daily_quests", daily_quests)
+	config.save(SAVE_PATH)
+
+# REHBER / NASIL OYNANIR PANELİ
+func _build_help_panel() -> void:
+	var dim = ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.82)
+	dim.anchor_right = 1.0
+	dim.anchor_bottom = 1.0
+	help_panel.add_child(dim)
+
+	var card = Panel.new()
+	card.position = Vector2(50, 180)
+	card.custom_minimum_size = Vector2(620, 680)
+	
+	var card_style = StyleBoxFlat.new()
+	card_style.bg_color = Color("222338")
+	card_style.corner_radius_top_left = 30
+	card_style.corner_radius_top_right = 30
+	card_style.corner_radius_bottom_left = 30
+	card_style.corner_radius_bottom_right = 30
+	card_style.border_width_left = 3
+	card_style.border_width_top = 3
+	card_style.border_width_right = 3
+	card_style.border_width_bottom = 3
+	card_style.border_color = Color("3a3b5c")
+	card.add_theme_stylebox_override("panel", card_style)
+	help_panel.add_child(card)
+
+	var h_title = Label.new()
+	h_title.text = "❓ NASIL OYNANIR & JOKERLER"
+	h_title.add_theme_font_size_override("font_size", 30)
+	h_title.add_theme_color_override("font_color", Color("ffffff"))
+	h_title.position = Vector2(0, 25)
+	h_title.size = Vector2(620, 45)
+	h_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	card.add_child(h_title)
+
+	var content = VBoxContainer.new()
+	content.position = Vector2(35, 85)
+	content.custom_minimum_size = Vector2(550, 500)
+	content.add_theme_constant_override("separation", 22)
+	card.add_child(content)
+
+	_add_help_item(content, "🎮 TEMEL AMAÇ", "Aşağıdaki parçaları ızgaraya sürükle. Yatay veya dikey hatları tamamen doldurarak patlat ve puan topla!")
+	_add_help_item(content, "🔨 ÇEKİÇ JOKERİ (%d🪙)" % COST_HAMMER, "Butona basıp ızgaradaki tek bir kareye tıkla. O blok anında patlar!")
+	_add_help_item(content, "💣 BOMBA JOKERİ (%d🪙)" % COST_BOMB, "Butona basıp ızgarada bir yere tıkla. Etrafındaki 3x3 geniş alanı patlatır!")
+	_add_help_item(content, "🔄 YENİLE JOKERİ (%d🪙)" % COST_REROLL, "Tepsideki 3 parçayı beğenmediğinde bas. Sana yepyeni 3 parça getirir!")
+
+	var close_btn = Button.new()
+	close_btn.text = "ANLADIM"
+	close_btn.position = Vector2(210, 600)
+	close_btn.custom_minimum_size = Vector2(200, 50)
+	close_btn.add_theme_font_size_override("font_size", 22)
+	close_btn.add_theme_color_override("font_color", Color("ffffff"))
+	close_btn.pressed.connect(func(): help_panel.visible = false)
+
+	var close_style = StyleBoxFlat.new()
+	close_style.bg_color = Color("2ed573")
+	close_style.corner_radius_top_left = 16
+	close_style.corner_radius_top_right = 16
+	close_style.corner_radius_bottom_left = 16
+	close_style.corner_radius_bottom_right = 16
+	close_btn.add_theme_stylebox_override("normal", close_style)
+	close_btn.add_theme_stylebox_override("hover", close_style)
+	close_btn.add_theme_stylebox_override("pressed", close_style)
+	card.add_child(close_btn)
+
+func _add_help_item(container: VBoxContainer, title_text: String, desc_text: String) -> void:
+	var box = VBoxContainer.new()
+	
+	var t = Label.new()
+	t.text = title_text
+	t.add_theme_font_size_override("font_size", 20)
+	t.add_theme_color_override("font_color", Color("f1c40f"))
+	box.add_child(t)
+
+	var d = Label.new()
+	d.text = desc_text
+	d.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	d.add_theme_font_size_override("font_size", 16)
+	d.add_theme_color_override("font_color", Color("dcdde1"))
+	box.add_child(d)
+
+	container.add_child(box)
+
 func _show_quest_complete_toast(quest_title: String) -> void:
 	Input.vibrate_handheld(250)
 	
 	var toast = Panel.new()
-	toast.position = Vector2(110, -80) # Ekranın hemen üstünden başlar
+	toast.position = Vector2(110, -80)
 	toast.custom_minimum_size = Vector2(500, 65)
-	toast.z_index = 180
+	toast.z_index = 200
 	
 	var t_style = StyleBoxFlat.new()
 	t_style.bg_color = Color("2ed573")
@@ -254,7 +633,6 @@ func _show_quest_complete_toast(quest_title: String) -> void:
 	lbl.size = Vector2(500, 65)
 	toast.add_child(lbl)
 
-	# Aşağı kayıp görünme ve yukarı kaçma animasyonu
 	var tween = create_tween()
 	tween.tween_property(toast, "position:y", 25.0, 0.4).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_interval(2.2)
@@ -293,7 +671,6 @@ func _update_quest_progress(quest_id: String, amount: int = 1, is_absolute: bool
 				q["current"] = min(q["current"] + amount, q["target"])
 				updated = true
 				
-			# Görev tam o an bittiyse oyun içi bildirim fırlatır!
 			if prev_val < q["target"] and q["current"] >= q["target"]:
 				_show_quest_complete_toast(q["title"])
 				
@@ -433,102 +810,6 @@ func _claim_quest_reward(quest: Dictionary) -> void:
 	Input.vibrate_handheld(150)
 	_refresh_quests_ui()
 
-func _build_joker_bar() -> void:
-	joker_bar = HBoxContainer.new()
-	joker_bar.position = Vector2(40, 810)
-	joker_bar.custom_minimum_size = Vector2(640, 70)
-	joker_bar.add_theme_constant_override("separation", 20)
-	add_child(joker_bar)
-
-	hammer_btn = _create_joker_button("🔨 %d🪙" % COST_HAMMER, Color("e67e22"))
-	hammer_btn.pressed.connect(func(): _toggle_joker(JokerType.HAMMER))
-	joker_bar.add_child(hammer_btn)
-
-	bomb_btn = _create_joker_button("💣 %d🪙" % COST_BOMB, Color("e74c3c"))
-	bomb_btn.pressed.connect(func(): _toggle_joker(JokerType.BOMB))
-	joker_bar.add_child(bomb_btn)
-
-	reroll_btn = _create_joker_button("🔄 %d🪙" % COST_REROLL, Color("9b59b6"))
-	reroll_btn.pressed.connect(_on_reroll_pressed)
-	joker_bar.add_child(reroll_btn)
-
-func _create_joker_button(text: String, base_color: Color) -> Button:
-	var btn = Button.new()
-	btn.text = text
-	btn.custom_minimum_size = Vector2(200, 65)
-	btn.add_theme_font_size_override("font_size", 22)
-	btn.add_theme_color_override("font_color", Color.WHITE)
-
-	var style = StyleBoxFlat.new()
-	style.bg_color = base_color
-	style.corner_radius_top_left = 16
-	style.corner_radius_top_right = 16
-	style.corner_radius_bottom_left = 16
-	style.corner_radius_bottom_right = 16
-	style.border_width_bottom = 5
-	style.border_color = base_color.darkened(0.3)
-
-	btn.add_theme_stylebox_override("normal", style)
-	btn.add_theme_stylebox_override("hover", style)
-	btn.add_theme_stylebox_override("pressed", style)
-	return btn
-
-func _toggle_joker(type: JokerType) -> void:
-	var required_cost := 0
-	if type == JokerType.HAMMER: required_cost = COST_HAMMER
-	elif type == JokerType.BOMB: required_cost = COST_BOMB
-
-	if gold_amount < required_cost:
-		_show_not_enough_gold_anim()
-		return
-
-	if active_joker == type:
-		active_joker = JokerType.NONE
-	else:
-		active_joker = type
-	_update_joker_buttons_visual()
-
-func _update_joker_buttons_visual() -> void:
-	hammer_btn.modulate = Color(1.6, 1.6, 1.6) if active_joker == JokerType.HAMMER else Color.WHITE
-	bomb_btn.modulate = Color(1.6, 1.6, 1.6) if active_joker == JokerType.BOMB else Color.WHITE
-
-func _on_cell_clicked_for_joker(cell_pos: Vector2i) -> void:
-	if active_joker == JokerType.NONE:
-		return
-
-	var success := false
-	var cost := 0
-
-	if active_joker == JokerType.HAMMER:
-		cost = COST_HAMMER
-		if gold_amount >= cost and grid.use_hammer(cell_pos):
-			success = true
-	elif active_joker == JokerType.BOMB:
-		cost = COST_BOMB
-		if gold_amount >= cost and grid.use_bomb(cell_pos):
-			success = true
-
-	if success:
-		gold_amount -= cost
-		_update_gold_display()
-		_update_quest_progress("use_jokers", 1)
-		save_save_data()
-		Input.vibrate_handheld(150)
-		active_joker = JokerType.NONE
-		_update_joker_buttons_visual()
-		_check_game_over()
-
-func _on_reroll_pressed() -> void:
-	if gold_amount >= COST_REROLL:
-		gold_amount -= COST_REROLL
-		_update_gold_display()
-		_update_quest_progress("use_jokers", 1)
-		save_save_data()
-		Input.vibrate_handheld(80)
-		_new_tray()
-	else:
-		_show_not_enough_gold_anim()
-
 func _show_not_enough_gold_anim() -> void:
 	Input.vibrate_handheld(200)
 	var tween = create_tween()
@@ -649,7 +930,6 @@ func _build_start_menu_panel() -> void:
 	play_btn.add_theme_stylebox_override("pressed", btn_hover)
 	start_menu_panel.add_child(play_btn)
 
-	# GÖREVLER BUTONU
 	var q_btn = Button.new()
 	q_btn.text = "🎯 GÜNLÜK GÖREVLER"
 	q_btn.position = Vector2(210, 595)
@@ -861,31 +1141,6 @@ func _on_start_game_pressed() -> void:
 		tween.tween_callback(func(): start_menu_panel.visible = false)
 	_new_tray()
 
-func load_save_data() -> void:
-	var config = ConfigFile.new()
-	var err = config.load(SAVE_PATH)
-	if err == OK:
-		high_score = config.get_value("game", "high_score", 0)
-		gold_amount = config.get_value("game", "gold_amount", 100)
-		master_volume = config.get_value("game", "master_volume", 1.0)
-		last_quest_date = config.get_value("quests", "last_quest_date", "")
-		daily_quests = config.get_value("quests", "daily_quests", [])
-	else:
-		high_score = 0
-		gold_amount = 100
-		master_volume = 1.0
-		last_quest_date = ""
-		daily_quests = []
-
-func save_save_data() -> void:
-	var config = ConfigFile.new()
-	config.set_value("game", "high_score", high_score)
-	config.set_value("game", "gold_amount", gold_amount)
-	config.set_value("game", "master_volume", master_volume)
-	config.set_value("quests", "last_quest_date", last_quest_date)
-	config.set_value("quests", "daily_quests", daily_quests)
-	config.save(SAVE_PATH)
-
 func _on_combo_timeout() -> void:
 	combo_count = 0
 
@@ -974,78 +1229,6 @@ func _new_tray() -> void:
 		tray.append(pv)
 
 	_check_game_over()
-
-func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -> void:
-	var total_cleared = rows_cleared + cols_cleared
-	
-	var place_multiplier = max(1, combo_count)
-	score += (cells_placed * place_multiplier)
-	
-	_update_quest_progress("place_blocks", cells_placed)
-
-	if total_cleared > 0:
-		streak_count += 1
-		_update_quest_progress("clear_lines", total_cleared)
-		
-		if streak_count >= 2:
-			_update_quest_progress("do_streaks", 1)
-		
-		var added_combo = 0
-		if rows_cleared > 0 and cols_cleared > 0:
-			added_combo = total_cleared * 4
-		else:
-			added_combo = total_cleared * 2
-			
-		combo_count += added_combo
-		combo_timer.start()
-		
-		var earned_gold = (total_cleared * 10) + (streak_count * 5) + (combo_count * 2)
-		gold_amount += earned_gold
-		_update_gold_display()
-		
-		var base_clear_score = total_cleared * total_cleared * 10
-		score += (base_clear_score * combo_count) + (streak_count * 20)
-		
-		if AudioManager.has_node("SfxBlast"):
-			var blast_sfx = AudioManager.get_node("SfxBlast")
-			blast_sfx.pitch_scale = min(1.0 + (combo_count + streak_count - 2) * 0.12, 2.2)
-			blast_sfx.play()
-		
-		var vibration_time = min(100 + (combo_count * 30) + (streak_count * 20), 300)
-		Input.vibrate_handheld(vibration_time)
-		
-		var random_offset = Vector2(randf_range(100, 412), randf_range(100, 412))
-		var pop_pos = grid.global_position + random_offset
-		
-		if streak_count >= 2:
-			_show_combo_popup("STREAK x%d! (+%d🪙)" % [streak_count, earned_gold], pop_pos, true)
-		elif combo_count >= 1:
-			_show_combo_popup("COMBO x%d! (+%d🪙)" % [combo_count, earned_gold], pop_pos, false)
-	else:
-		streak_count = 0
-		Input.vibrate_handheld(40)
-
-	score_label.text = "Score: %d" % score
-	_update_quest_progress("reach_score", score, true)
-	
-	if score > high_score:
-		high_score = score
-		high_score_label.text = "Best: %d" % high_score
-	
-	save_save_data()
-
-	await get_tree().process_frame
-
-	var all_used = true
-	for p in tray:
-		if is_instance_valid(p) and not p.used_flag:
-			all_used = false
-			break
-
-	if all_used:
-		_new_tray()
-	else:
-		_check_game_over()
 
 func _check_game_over() -> void:
 	var any_playable = false
