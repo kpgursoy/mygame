@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://3qip2wprnsjf"]
 
 [ext_resource type="Script" uid="uid://csraswc1pwf0r" path="res://scripts/Main.gd" id="1"]
-[ext_resource type="AudioStream" uid="uid://c7hv2tlu3naat" path="res://assets/gamemusic.mp3" id="2_rvslj"]
+[ext_resource type="AudioStream" uid="uid://bnw6t1u72h3n7" path="res://assets/gamemusic.mp3" id="2_rvslj"]
 
 [node name="Main" type="Control" unique_id=20632768]
 layout_mode = 3
