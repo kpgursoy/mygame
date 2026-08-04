@@ -32,7 +32,6 @@ var tray: Array = []
 var score := 0
 var high_score := 0
 var gold_amount := 100
-var master_volume := 1.0
 const SAVE_PATH: String = "user://save_data.cfg"
 
 # ELDEKİ JOKER ADETLERİ (ENVANTER)
@@ -77,11 +76,27 @@ var start_menu_panel: Control
 var settings_panel: Control
 var quests_panel: Control
 var help_panel: Control
-var volume_label: Label
-var volume_slider: HSlider
 var in_game_settings_btn: Button
 var in_game_quests_btn: Button
 var in_game_help_btn: Button
+
+# YENİ AYAR DEĞİŞKENLERİ
+var master_volume := 1.0
+var music_volume := 1.0
+var is_dark_mode := true
+
+var main_bg: ColorRect
+var settings_vbox: VBoxContainer
+var volume_label: Label
+var volume_slider: HSlider
+var music_label: Label
+var music_slider: HSlider
+var theme_btn: Button
+var credits_btn: Button
+var credits_panel: Control
+var restart_btn: Button
+var main_menu_btn: Button
+var settings_card: Panel
 
 # GÜNLÜK GÖREV SİSTEMİ
 var last_quest_date := ""
@@ -96,23 +111,18 @@ var all_quest_templates := [
 	{"id": "use_jokers", "title": "2 Kez Joker Kullan", "target": 2, "reward": 90}
 ]
 
-# DİNAMİK BUTONLAR
-var restart_btn: Button
-var main_menu_btn: Button
-var settings_card: Panel
-
 var studio_name_text := "BONET GAMES"
 
 func _ready() -> void:
 	randomize()
 	mouse_filter = Control.MOUSE_FILTER_PASS
 
-	var bg = ColorRect.new()
-	bg.color = Color("1a1a2e")
-	bg.anchor_right = 1.0
-	bg.anchor_bottom = 1.0
-	bg.mouse_filter = ColorRect.MOUSE_FILTER_IGNORE
-	add_child(bg)
+	# ANA ARKA PLAN (Tema değişimleri için bunu kullanıyoruz)
+	main_bg = ColorRect.new()
+	main_bg.anchor_right = 1.0
+	main_bg.anchor_bottom = 1.0
+	main_bg.mouse_filter = ColorRect.MOUSE_FILTER_IGNORE
+	add_child(main_bg)
 	
 	combo_timer = Timer.new()
 	combo_timer.wait_time = 8.0
@@ -121,6 +131,7 @@ func _ready() -> void:
 	add_child(combo_timer)
 
 	load_save_data()
+	_apply_theme()
 	_check_and_reset_daily_quests()
 
 	var title = Label.new()
@@ -168,6 +179,7 @@ func _ready() -> void:
 	add_child(gold_label)
 
 	_apply_volume(master_volume)
+	_apply_music_volume(music_volume)
 
 	grid = GridView.new()
 	grid.position = Vector2(64, 150)
@@ -221,8 +233,56 @@ func _ready() -> void:
 	help_panel.visible = false
 	add_child(help_panel)
 	_build_help_panel()
+	
+	_build_credits_panel()
 
 	_show_splash_screen()
+
+# --- TEMA VE SES FONKSİYONLARI ---
+func _apply_theme() -> void:
+	if is_dark_mode:
+		main_bg.color = Color("1a1a2e")
+		if theme_btn: theme_btn.text = "🌙 KARANLIK MOD"
+	else:
+		main_bg.color = Color("e0e6ed")
+		if theme_btn: theme_btn.text = "☀️ AYDINLIK MOD"
+
+func _toggle_theme() -> void:
+	is_dark_mode = !is_dark_mode
+	_apply_theme()
+	save_save_data()
+
+func _on_volume_changed(val: float) -> void:
+	master_volume = val
+	volume_label.text = "EFEKT SESİ: %d%%" % int(master_volume * 100)
+	_apply_volume(master_volume)
+	save_save_data()
+
+func _apply_volume(val: float) -> void:
+	var bus_index = AudioServer.get_bus_index("Master")
+	if bus_index >= 0:
+		if val <= 0.001:
+			AudioServer.set_bus_mute(bus_index, true)
+		else:
+			AudioServer.set_bus_mute(bus_index, false)
+			var db = linear_to_db(val)
+			AudioServer.set_bus_volume_db(bus_index, db)
+
+func _on_music_changed(val: float) -> void:
+	music_volume = val
+	music_label.text = "MÜZİK: %d%%" % int(music_volume * 100)
+	_apply_music_volume(music_volume)
+	save_save_data()
+
+func _apply_music_volume(val: float) -> void:
+	# DİKKAT: Editor altındaki Audio kısmından "Music" bus'ını eklemiş olman gerekiyor!
+	var bus_index = AudioServer.get_bus_index("Music")
+	if bus_index >= 0:
+		if val <= 0.001:
+			AudioServer.set_bus_mute(bus_index, true)
+		else:
+			AudioServer.set_bus_mute(bus_index, false)
+			AudioServer.set_bus_volume_db(bus_index, linear_to_db(val))
 
 func _create_icon_button(icon_text: String, pos: Vector2) -> Button:
 	var btn = Button.new()
@@ -402,11 +462,9 @@ func _on_reroll_pressed() -> void:
 	else:
 		_try_buy_joker(JokerType.NONE)
 
-# YENİLENMİŞ YÜKSEK PUAN & TAHTA TEMİZLEME MEKANİĞİ
 func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -> void:
 	var total_cleared = rows_cleared + cols_cleared
 	
-	# 1. Yerleştirilen her tekil kareye 10 puan (Eskiden 1'di)
 	score += (cells_placed * 10)
 	_update_quest_progress("place_blocks", cells_placed)
 
@@ -425,7 +483,6 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 		gold_amount += earned_gold
 		_update_gold_display()
 		
-		# 2. Çizgi Başına Taban 250 Puan (Eskiden 100 civarıydı)
 		var base_clear_score = total_cleared * 250
 		score += (base_clear_score * max(1, combo_count)) + (streak_count * 50)
 		
@@ -445,7 +502,6 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 		elif combo_count >= 1:
 			_show_combo_popup("COMBO x%d! (+%d🪙)" % [combo_count, earned_gold], pop_pos, false)
 			
-		# 3. 🧹 FULL TAHTA TEMİZLEME (ALL CLEAR) KONTROLÜ
 		if _is_board_completely_empty():
 			score += 500
 			gold_amount += 50
@@ -478,7 +534,6 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 	else:
 		_check_game_over()
 
-# TAHTADA HİÇ BLOK KALDI MI KONTROL EDEN FONKSİYON
 func _is_board_completely_empty() -> bool:
 	if not grid or not ("grid_data" in grid): return false
 	for r in range(grid.GRID_SIZE):
@@ -494,6 +549,8 @@ func load_save_data() -> void:
 		high_score = config.get_value("game", "high_score", 0)
 		gold_amount = config.get_value("game", "gold_amount", 100)
 		master_volume = config.get_value("game", "master_volume", 1.0)
+		music_volume = config.get_value("game", "music_volume", 1.0)
+		is_dark_mode = config.get_value("game", "is_dark_mode", true)
 		hammer_count = config.get_value("jokers", "hammer_count", 3)
 		bomb_count = config.get_value("jokers", "bomb_count", 1)
 		reroll_count = config.get_value("jokers", "reroll_count", 2)
@@ -503,6 +560,8 @@ func load_save_data() -> void:
 		high_score = 0
 		gold_amount = 100
 		master_volume = 1.0
+		music_volume = 1.0
+		is_dark_mode = true
 		hammer_count = 3
 		bomb_count = 1
 		reroll_count = 2
@@ -514,6 +573,8 @@ func save_save_data() -> void:
 	config.set_value("game", "high_score", high_score)
 	config.set_value("game", "gold_amount", gold_amount)
 	config.set_value("game", "master_volume", master_volume)
+	config.set_value("game", "music_volume", music_volume)
+	config.set_value("game", "is_dark_mode", is_dark_mode)
 	config.set_value("jokers", "hammer_count", hammer_count)
 	config.set_value("jokers", "bomb_count", bomb_count)
 	config.set_value("jokers", "reroll_count", reroll_count)
@@ -521,7 +582,6 @@ func save_save_data() -> void:
 	config.set_value("quests", "daily_quests", daily_quests)
 	config.save(SAVE_PATH)
 
-# REHBER / NASIL OYNANIR PANELİ
 func _build_help_panel() -> void:
 	var dim = ColorRect.new()
 	dim.color = Color(0, 0, 0, 0.82)
@@ -882,7 +942,7 @@ func _show_combo_popup(text: String, spawn_pos: Vector2, is_streak: bool = false
 
 func _build_start_menu_panel() -> void:
 	var dim = ColorRect.new()
-	dim.color = Color("1a1a2e")
+	dim.color = Color("1a1a2e", 0.95)
 	dim.anchor_right = 1.0
 	dim.anchor_bottom = 1.0
 	start_menu_panel.add_child(dim)
@@ -974,16 +1034,17 @@ func _build_start_menu_panel() -> void:
 	settings_btn.add_theme_stylebox_override("pressed", set_style)
 	start_menu_panel.add_child(settings_btn)
 
+# --- YENİLENMİŞ AYARLAR PANELİ (VBoxContainer ile) ---
 func _build_settings_panel() -> void:
 	var dim = ColorRect.new()
-	dim.color = Color(0, 0, 0, 0.75)
+	dim.color = Color(0, 0, 0, 0.8)
 	dim.anchor_right = 1.0
 	dim.anchor_bottom = 1.0
 	settings_panel.add_child(dim)
 
 	settings_card = Panel.new()
-	settings_card.position = Vector2(100, 300)
-	settings_card.custom_minimum_size = Vector2(520, 420)
+	settings_card.custom_minimum_size = Vector2(520, 650)
+	settings_card.position = Vector2(100, 200)
 	
 	var card_style = StyleBoxFlat.new()
 	card_style.bg_color = Color("222338")
@@ -1003,105 +1064,116 @@ func _build_settings_panel() -> void:
 	set_title.text = "AYARLAR"
 	set_title.add_theme_font_size_override("font_size", 38)
 	set_title.add_theme_color_override("font_color", Color("ffffff"))
-	set_title.position = Vector2(0, 25)
+	set_title.position = Vector2(0, 20)
 	set_title.size = Vector2(520, 50)
 	set_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settings_card.add_child(set_title)
 
+	settings_vbox = VBoxContainer.new()
+	settings_vbox.position = Vector2(60, 90)
+	settings_vbox.custom_minimum_size = Vector2(400, 500)
+	settings_vbox.add_theme_constant_override("separation", 15)
+	settings_card.add_child(settings_vbox)
+
+	# SFX
 	volume_label = Label.new()
-	volume_label.text = "SES DÜZEYİ: %d%%" % int(master_volume * 100)
-	volume_label.add_theme_font_size_override("font_size", 24)
+	volume_label.text = "EFEKT SESİ: %d%%" % int(master_volume * 100)
+	volume_label.add_theme_font_size_override("font_size", 20)
 	volume_label.add_theme_color_override("font_color", Color("f1c40f"))
-	volume_label.position = Vector2(0, 95)
-	volume_label.size = Vector2(520, 35)
 	volume_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	settings_card.add_child(volume_label)
+	settings_vbox.add_child(volume_label)
 
 	volume_slider = HSlider.new()
 	volume_slider.min_value = 0.0
 	volume_slider.max_value = 1.0
 	volume_slider.step = 0.01
 	volume_slider.value = master_volume
-	volume_slider.position = Vector2(60, 140)
-	volume_slider.custom_minimum_size = Vector2(400, 40)
 	volume_slider.value_changed.connect(_on_volume_changed)
-	settings_card.add_child(volume_slider)
+	settings_vbox.add_child(volume_slider)
+
+	# MUSIC
+	music_label = Label.new()
+	music_label.text = "MÜZİK: %d%%" % int(music_volume * 100)
+	music_label.add_theme_font_size_override("font_size", 20)
+	music_label.add_theme_color_override("font_color", Color("f1c40f"))
+	music_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	settings_vbox.add_child(music_label)
+
+	music_slider = HSlider.new()
+	music_slider.min_value = 0.0
+	music_slider.max_value = 1.0
+	music_slider.step = 0.01
+	music_slider.value = music_volume
+	music_slider.value_changed.connect(_on_music_changed)
+	settings_vbox.add_child(music_slider)
+
+	var space = Control.new()
+	space.custom_minimum_size = Vector2(0, 10)
+	settings_vbox.add_child(space)
+
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = Color("3a3b5c")
+	btn_style.corner_radius_top_left = 16
+	btn_style.corner_radius_top_right = 16
+	btn_style.corner_radius_bottom_left = 16
+	btn_style.corner_radius_bottom_right = 16
+	btn_style.border_width_bottom = 4
+	btn_style.border_color = Color("2d2e47")
+
+	theme_btn = Button.new()
+	theme_btn.custom_minimum_size = Vector2(400, 50)
+	theme_btn.add_theme_font_size_override("font_size", 20)
+	theme_btn.add_theme_stylebox_override("normal", btn_style)
+	theme_btn.pressed.connect(_toggle_theme)
+	settings_vbox.add_child(theme_btn)
+
+	credits_btn = Button.new()
+	credits_btn.text = "ℹ️ YAPIMCILAR (CREDITS)"
+	credits_btn.custom_minimum_size = Vector2(400, 50)
+	credits_btn.add_theme_font_size_override("font_size", 20)
+	credits_btn.add_theme_stylebox_override("normal", btn_style)
+	credits_btn.pressed.connect(func(): credits_panel.visible = true)
+	settings_vbox.add_child(credits_btn)
 
 	restart_btn = Button.new()
 	restart_btn.text = "🔄 YENİDEN BAŞLAT"
-	restart_btn.position = Vector2(110, 205)
-	restart_btn.custom_minimum_size = Vector2(300, 55)
-	restart_btn.add_theme_font_size_override("font_size", 22)
-	restart_btn.add_theme_color_override("font_color", Color("ffffff"))
+	restart_btn.custom_minimum_size = Vector2(400, 50)
+	restart_btn.add_theme_font_size_override("font_size", 20)
+	restart_btn.add_theme_stylebox_override("normal", btn_style)
 	restart_btn.pressed.connect(_on_settings_restart_pressed)
-
-	var rst_style = StyleBoxFlat.new()
-	rst_style.bg_color = Color("e67e22")
-	rst_style.corner_radius_top_left = 16
-	rst_style.corner_radius_top_right = 16
-	rst_style.corner_radius_bottom_left = 16
-	rst_style.corner_radius_bottom_right = 16
-	rst_style.border_width_bottom = 5
-	rst_style.border_color = Color("d35400")
-	restart_btn.add_theme_stylebox_override("normal", rst_style)
-	restart_btn.add_theme_stylebox_override("hover", rst_style)
-	restart_btn.add_theme_stylebox_override("pressed", rst_style)
-	settings_card.add_child(restart_btn)
+	settings_vbox.add_child(restart_btn)
 
 	main_menu_btn = Button.new()
 	main_menu_btn.text = "🏠 ANA MENÜ"
-	main_menu_btn.position = Vector2(110, 275)
-	main_menu_btn.custom_minimum_size = Vector2(300, 55)
-	main_menu_btn.add_theme_font_size_override("font_size", 22)
-	main_menu_btn.add_theme_color_override("font_color", Color("ffffff"))
+	main_menu_btn.custom_minimum_size = Vector2(400, 50)
+	main_menu_btn.add_theme_font_size_override("font_size", 20)
+	main_menu_btn.add_theme_stylebox_override("normal", btn_style)
 	main_menu_btn.pressed.connect(_on_settings_menu_pressed)
-
-	var menu_style = StyleBoxFlat.new()
-	menu_style.bg_color = Color("2980b9")
-	menu_style.corner_radius_top_left = 16
-	menu_style.corner_radius_top_right = 16
-	menu_style.corner_radius_bottom_left = 16
-	menu_style.corner_radius_bottom_right = 16
-	menu_style.border_width_bottom = 5
-	menu_style.border_color = Color("2980b9").darkened(0.2)
-	main_menu_btn.add_theme_stylebox_override("normal", menu_style)
-	main_menu_btn.add_theme_stylebox_override("hover", menu_style)
-	main_menu_btn.add_theme_stylebox_override("pressed", menu_style)
-	settings_card.add_child(main_menu_btn)
+	settings_vbox.add_child(main_menu_btn)
 
 	var close_btn = Button.new()
 	close_btn.text = "KAPAT"
-	close_btn.position = Vector2(160, 345)
-	close_btn.custom_minimum_size = Vector2(200, 50)
-	close_btn.add_theme_font_size_override("font_size", 22)
-	close_btn.add_theme_color_override("font_color", Color("ffffff"))
-	close_btn.pressed.connect(_close_settings)
-
-	var close_style = StyleBoxFlat.new()
+	close_btn.custom_minimum_size = Vector2(400, 50)
+	close_btn.add_theme_font_size_override("font_size", 20)
+	
+	var close_style = btn_style.duplicate()
 	close_style.bg_color = Color("2ed573")
-	close_style.corner_radius_top_left = 16
-	close_style.corner_radius_top_right = 16
-	close_style.corner_radius_bottom_left = 16
-	close_style.corner_radius_bottom_right = 16
-	close_style.border_width_bottom = 5
 	close_style.border_color = Color("26af5f")
-
 	close_btn.add_theme_stylebox_override("normal", close_style)
-	close_btn.add_theme_stylebox_override("hover", close_style)
-	close_btn.add_theme_stylebox_override("pressed", close_style)
-	settings_card.add_child(close_btn)
+	close_btn.pressed.connect(_close_settings)
+	settings_vbox.add_child(close_btn)
 
 func _open_settings(is_in_game: bool = false) -> void:
 	if is_in_game:
 		restart_btn.visible = true
 		main_menu_btn.visible = true
-		settings_card.custom_minimum_size = Vector2(520, 420)
-		settings_card.position = Vector2(100, 300)
+		settings_card.custom_minimum_size = Vector2(520, 580)
+		settings_card.position = Vector2(100, 200)
 	else:
 		restart_btn.visible = false
 		main_menu_btn.visible = false
-		settings_card.custom_minimum_size = Vector2(520, 270)
-		settings_card.position = Vector2(100, 370)
+		settings_card.custom_minimum_size = Vector2(520, 450)
+		settings_card.position = Vector2(100, 250)
 		
 	settings_panel.visible = true
 
@@ -1118,21 +1190,56 @@ func _on_settings_menu_pressed() -> void:
 	start_menu_panel.modulate.a = 1.0
 	start_menu_panel.visible = true
 
-func _on_volume_changed(val: float) -> void:
-	master_volume = val
-	volume_label.text = "SES DÜZEYİ: %d%%" % int(master_volume * 100)
-	_apply_volume(master_volume)
-	save_save_data()
+# --- YAPIMCILAR (CREDITS) PANELİ ---
+func _build_credits_panel() -> void:
+	credits_panel = Control.new()
+	credits_panel.anchor_right = 1.0
+	credits_panel.anchor_bottom = 1.0
+	credits_panel.z_index = 190
+	credits_panel.visible = false
+	add_child(credits_panel)
 
-func _apply_volume(val: float) -> void:
-	var bus_index = AudioServer.get_bus_index("Master")
-	if bus_index >= 0:
-		if val <= 0.001:
-			AudioServer.set_bus_mute(bus_index, true)
-		else:
-			AudioServer.set_bus_mute(bus_index, false)
-			var db = linear_to_db(val)
-			AudioServer.set_bus_volume_db(bus_index, db)
+	var dim = ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.95)
+	dim.anchor_right = 1.0
+	dim.anchor_bottom = 1.0
+	credits_panel.add_child(dim)
+
+	var title = Label.new()
+	title.text = "BONET GAMES"
+	title.add_theme_font_size_override("font_size", 48)
+	title.add_theme_color_override("font_color", Color("f1c40f"))
+	title.position = Vector2(0, 300)
+	title.size = Vector2(720, 60)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	credits_panel.add_child(title)
+
+	var desc = Label.new()
+	desc.text = "Geliştirici: Bonet Games\n\nVersiyon: 1.0.0\n\nOynadığınız için teşekkürler!"
+	desc.add_theme_font_size_override("font_size", 24)
+	desc.add_theme_color_override("font_color", Color("ffffff"))
+	desc.position = Vector2(0, 400)
+	desc.size = Vector2(720, 150)
+	desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	credits_panel.add_child(desc)
+
+	var close_btn = Button.new()
+	close_btn.text = "GERİ DÖN"
+	close_btn.position = Vector2(210, 650)
+	close_btn.custom_minimum_size = Vector2(300, 60)
+	close_btn.add_theme_font_size_override("font_size", 24)
+	close_btn.pressed.connect(func(): credits_panel.visible = false)
+	
+	var style = StyleBoxFlat.new()
+	style.bg_color = Color("e74c3c")
+	style.corner_radius_top_left = 16
+	style.corner_radius_top_right = 16
+	style.corner_radius_bottom_left = 16
+	style.corner_radius_bottom_right = 16
+	style.border_width_bottom = 6
+	style.border_color = Color("c0392b")
+	close_btn.add_theme_stylebox_override("normal", style)
+	credits_panel.add_child(close_btn)
 
 func _on_start_game_pressed() -> void:
 	if start_menu_panel:
