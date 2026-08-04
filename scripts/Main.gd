@@ -45,7 +45,8 @@ var tray: Array = []
 var score := 0
 var high_score := 0
 var gold_amount := 100
-var master_volume := 1.0
+var master_volume := 1.0 # Efekt (SFX) sesi olarak kullanılacak
+var music_volume := 1.0 # Müzik sesi
 var current_lang := "tr" # "tr" veya "en"
 const SAVE_PATH: String = "user://save_data.cfg"
 
@@ -99,9 +100,11 @@ var settings_title_label: Label
 var quests_panel: Control
 var help_panel: Control
 var volume_label: Label
+var volume_slider: HSlider
+var music_label: Label
+var music_slider: HSlider
 var lang_label: Label
 var lang_btn: Button
-var volume_slider: HSlider
 var in_game_settings_btn: Button
 var in_game_quests_btn: Button
 var in_game_help_btn: Button
@@ -136,7 +139,8 @@ var tr_data := {
 	"daily_quests": "🎯 GÜNLÜK GÖREVLER",
 	"settings": "⚙ AYARLAR",
 	"settings_title": "AYARLAR",
-	"volume": "SES DÜZEYİ: %d%%",
+	"sfx_volume": "EFEKT SESİ: %d%%",
+	"music_volume": "MÜZİK SESİ: %d%%",
 	"language": "DİL / LANGUAGE",
 	"restart": "🔄 YENİDEN BAŞLAT",
 	"main_menu": "🏠 ANA MENÜ",
@@ -171,7 +175,8 @@ var en_data := {
 	"daily_quests": "🎯 DAILY QUESTS",
 	"settings": "⚙ SETTINGS",
 	"settings_title": "SETTINGS",
-	"volume": "VOLUME: %d%%",
+	"sfx_volume": "SFX VOLUME: %d%%",
+	"music_volume": "MUSIC VOLUME: %d%%",
 	"language": "LANGUAGE / DİL",
 	"restart": "🔄 RESTART",
 	"main_menu": "🏠 MAIN MENU",
@@ -265,6 +270,7 @@ func _ready() -> void:
 	add_child(gold_label)
 
 	_apply_volume(master_volume)
+	_apply_music_volume(music_volume)
 
 	grid = GridView.new()
 	grid.position = Vector2(64, 150)
@@ -332,7 +338,8 @@ func _update_all_ui_texts() -> void:
 	if start_settings_btn: start_settings_btn.text = t("settings")
 	
 	if settings_title_label: settings_title_label.text = t("settings_title")
-	if volume_label: volume_label.text = t("volume") % int(master_volume * 100)
+	if volume_label: volume_label.text = t("sfx_volume") % int(master_volume * 100)
+	if music_label: music_label.text = t("music_volume") % int(music_volume * 100)
 	if lang_label: lang_label.text = t("language")
 	if lang_btn: lang_btn.text = "🇹🇷 TÜRKÇE" if current_lang == "tr" else "🇬🇧 ENGLISH"
 	if restart_btn: restart_btn.text = t("restart")
@@ -616,6 +623,7 @@ func load_save_data() -> void:
 		high_score = config.get_value("game", "high_score", 0)
 		gold_amount = config.get_value("game", "gold_amount", 100)
 		master_volume = config.get_value("game", "master_volume", 1.0)
+		music_volume = config.get_value("game", "music_volume", 1.0)
 		current_lang = config.get_value("game", "current_lang", "tr")
 		hammer_count = config.get_value("jokers", "hammer_count", 3)
 		bomb_count = config.get_value("jokers", "bomb_count", 1)
@@ -626,6 +634,7 @@ func load_save_data() -> void:
 		high_score = 0
 		gold_amount = 100
 		master_volume = 1.0
+		music_volume = 1.0
 		current_lang = "tr"
 		hammer_count = 3
 		bomb_count = 1
@@ -638,6 +647,7 @@ func save_save_data() -> void:
 	config.set_value("game", "high_score", high_score)
 	config.set_value("game", "gold_amount", gold_amount)
 	config.set_value("game", "master_volume", master_volume)
+	config.set_value("game", "music_volume", music_volume)
 	config.set_value("game", "current_lang", current_lang)
 	config.set_value("jokers", "hammer_count", hammer_count)
 	config.set_value("jokers", "bomb_count", bomb_count)
@@ -1100,8 +1110,8 @@ func _build_settings_panel() -> void:
 	settings_panel.add_child(dim)
 
 	settings_card = Panel.new()
-	settings_card.position = Vector2(80, 240)
-	settings_card.custom_minimum_size = Vector2(560, 500)
+	settings_card.position = Vector2(80, 220)
+	settings_card.custom_minimum_size = Vector2(560, 560)
 	
 	var card_style = StyleBoxFlat.new()
 	card_style.bg_color = Color("222338")
@@ -1125,6 +1135,7 @@ func _build_settings_panel() -> void:
 	settings_title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settings_card.add_child(settings_title_label)
 
+	# --- SFX (EFEKT SESİ) ---
 	volume_label = Label.new()
 	volume_label.add_theme_font_size_override("font_size", 22)
 	volume_label.add_theme_color_override("font_color", Color("f1c40f"))
@@ -1142,18 +1153,37 @@ func _build_settings_panel() -> void:
 	volume_slider.custom_minimum_size = Vector2(400, 35)
 	volume_slider.value_changed.connect(_on_volume_changed)
 	settings_card.add_child(volume_slider)
+	
+	# --- MÜZİK SESİ ---
+	music_label = Label.new()
+	music_label.add_theme_font_size_override("font_size", 22)
+	music_label.add_theme_color_override("font_color", Color("f1c40f"))
+	music_label.position = Vector2(0, 155)
+	music_label.size = Vector2(560, 30)
+	music_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	settings_card.add_child(music_label)
 
-	# DİL SEÇİMİ BÖLÜMÜ
+	music_slider = HSlider.new()
+	music_slider.min_value = 0.0
+	music_slider.max_value = 1.0
+	music_slider.step = 0.01
+	music_slider.value = music_volume
+	music_slider.position = Vector2(80, 190)
+	music_slider.custom_minimum_size = Vector2(400, 35)
+	music_slider.value_changed.connect(_on_music_changed)
+	settings_card.add_child(music_slider)
+
+	# --- DİL SEÇİMİ ---
 	lang_label = Label.new()
 	lang_label.add_theme_font_size_override("font_size", 22)
 	lang_label.add_theme_color_override("font_color", Color("f1c40f"))
-	lang_label.position = Vector2(0, 165)
+	lang_label.position = Vector2(0, 240)
 	lang_label.size = Vector2(560, 30)
 	lang_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settings_card.add_child(lang_label)
 
 	lang_btn = Button.new()
-	lang_btn.position = Vector2(150, 205)
+	lang_btn.position = Vector2(150, 280)
 	lang_btn.custom_minimum_size = Vector2(260, 50)
 	lang_btn.add_theme_font_size_override("font_size", 22)
 	lang_btn.pressed.connect(_toggle_language)
@@ -1171,8 +1201,9 @@ func _build_settings_panel() -> void:
 	lang_btn.add_theme_stylebox_override("pressed", lang_style)
 	settings_card.add_child(lang_btn)
 
+	# --- OYUN İÇİ BUTONLAR ---
 	restart_btn = Button.new()
-	restart_btn.position = Vector2(130, 275)
+	restart_btn.position = Vector2(130, 350)
 	restart_btn.custom_minimum_size = Vector2(300, 55)
 	restart_btn.add_theme_font_size_override("font_size", 22)
 	restart_btn.add_theme_color_override("font_color", Color("ffffff"))
@@ -1192,7 +1223,7 @@ func _build_settings_panel() -> void:
 	settings_card.add_child(restart_btn)
 
 	main_menu_btn = Button.new()
-	main_menu_btn.position = Vector2(130, 345)
+	main_menu_btn.position = Vector2(130, 420)
 	main_menu_btn.custom_minimum_size = Vector2(300, 55)
 	main_menu_btn.add_theme_font_size_override("font_size", 22)
 	main_menu_btn.add_theme_color_override("font_color", Color("ffffff"))
@@ -1212,7 +1243,7 @@ func _build_settings_panel() -> void:
 	settings_card.add_child(main_menu_btn)
 
 	close_settings_btn = Button.new()
-	close_settings_btn.position = Vector2(180, 420)
+	close_settings_btn.position = Vector2(180, 490)
 	close_settings_btn.custom_minimum_size = Vector2(200, 50)
 	close_settings_btn.add_theme_font_size_override("font_size", 22)
 	close_settings_btn.add_theme_color_override("font_color", Color("ffffff"))
@@ -1242,13 +1273,15 @@ func _open_settings(is_in_game: bool = false) -> void:
 	if is_in_game:
 		restart_btn.visible = true
 		main_menu_btn.visible = true
-		settings_card.custom_minimum_size = Vector2(560, 500)
+		settings_card.custom_minimum_size = Vector2(560, 560)
 		settings_card.position = Vector2(80, 220)
+		close_settings_btn.position = Vector2(180, 490)
 	else:
 		restart_btn.visible = false
 		main_menu_btn.visible = false
-		settings_card.custom_minimum_size = Vector2(560, 350)
-		settings_card.position = Vector2(80, 300)
+		settings_card.custom_minimum_size = Vector2(560, 420)
+		settings_card.position = Vector2(80, 280)
+		close_settings_btn.position = Vector2(180, 350)
 		
 	settings_panel.visible = true
 
@@ -1267,7 +1300,7 @@ func _on_settings_menu_pressed() -> void:
 
 func _on_volume_changed(val: float) -> void:
 	master_volume = val
-	volume_label.text = t("volume") % int(master_volume * 100)
+	volume_label.text = t("sfx_volume") % int(master_volume * 100)
 	_apply_volume(master_volume)
 	save_save_data()
 
@@ -1280,6 +1313,21 @@ func _apply_volume(val: float) -> void:
 			AudioServer.set_bus_mute(bus_index, false)
 			var db = linear_to_db(val)
 			AudioServer.set_bus_volume_db(bus_index, db)
+
+func _on_music_changed(val: float) -> void:
+	music_volume = val
+	music_label.text = t("music_volume") % int(music_volume * 100)
+	_apply_music_volume(music_volume)
+	save_save_data()
+
+func _apply_music_volume(val: float) -> void:
+	var bus_index = AudioServer.get_bus_index("Music")
+	if bus_index >= 0:
+		if val <= 0.001:
+			AudioServer.set_bus_mute(bus_index, true)
+		else:
+			AudioServer.set_bus_mute(bus_index, false)
+			AudioServer.set_bus_volume_db(bus_index, linear_to_db(val))
 
 func _on_start_game_pressed() -> void:
 	if start_menu_panel:
