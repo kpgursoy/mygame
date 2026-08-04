@@ -16,7 +16,6 @@ var shapes: Array = [
 	[Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],
 	[Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, 2)],
 	[Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(0, 2)],
-	[Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1), Vector2i(1, 2)],
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(0, 2)],
 ]
@@ -135,7 +134,7 @@ func _ready() -> void:
 	_check_and_reset_daily_quests()
 
 	var title = Label.new()
-	title.text = "BLOCK BLAST"
+	title.text = ""
 	title.add_theme_font_size_override("font_size", 40)
 	title.add_theme_color_override("font_color", Color("f5f5f5"))
 	title.position = Vector2(0, 20)
@@ -935,8 +934,8 @@ func _show_combo_popup(text: String, spawn_pos: Vector2, is_streak: bool = false
 
 	var tween = create_tween().set_parallel(true)
 	tween.tween_property(pop_label, "scale", Vector2(1.35 if is_streak else 1.2, 1.35 if is_streak else 1.2), 0.25).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(pop_label, "position:y", pop_label.position.y - 70.0, 0.65).set_trans(Tween.TRANS_QUAD)
-	tween.tween_property(pop_label, "modulate:a", 0.0, 0.65).set_ease(Tween.EASE_IN)
+	tween.tween_property(pop_label, "position:y", pop_label.position.y - 70.0, 0.95).set_trans(Tween.TRANS_QUAD)
+	tween.tween_property(pop_label, "modulate:a", 0.0, 0.95).set_ease(Tween.EASE_IN)
 	
 	tween.chain().tween_callback(pop_label.queue_free)
 
