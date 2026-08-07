@@ -1,28 +1,32 @@
 extends Control
 
-var shapes: Array = [
-	# --- TEKLİ VE KÜÇÜK PARÇALAR ---
-	[Vector2i(0, 0)],
-	[Vector2i(0, 0), Vector2i(1, 0)],
-	[Vector2i(0, 0), Vector2i(0, 1)],
-	
-	# --- ÇİZGİLER (3'lü ve 4'lü) ---
+# --- KOLAY / KÜÇÜK PARÇALAR (Garanti gelme ihtimali olanlar) ---
+var easy_shapes: Array = [
+	[Vector2i(0, 0)], # 1x1 Tekli
+	[Vector2i(0, 0), Vector2i(1, 0)], # 2x1 Yatay
+	[Vector2i(0, 0), Vector2i(0, 1)], # 1x2 Dikey
+	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)], # 2x2 Kare
+	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1)], # Küçük L
+]
+
+# --- ZOR / BÜYÜK PARÇALAR ---
+var hard_shapes: Array = [
+	# 3'lü ve 4'lü Çizgiler
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)],
 	[Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)],
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0)],
 	[Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2), Vector2i(0, 3)],
 	
-	# --- KARELER VE DİKDÖRTGENLER ---
-	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)], # 2x2 Kare
-	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)], # 2x3 Yatay
-	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(0, 2), Vector2i(1, 2)], # 3x2 Dikey
+	# Dikdörtgenler ve Dev Kareler
+	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],
+	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(0, 2), Vector2i(1, 2)],
 	[
 		Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0),
 		Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1),
 		Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 2)
 	], # 3x3 Dev Kare
 	
-	# --- L, J VE T ŞEKİLLERİ ---
+	# L, J VE T Şekilleri
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(0, 1)],
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(2, 1)],
 	[Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],
@@ -30,6 +34,7 @@ var shapes: Array = [
 	[Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],
 	[Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(1, 2)],
 	[Vector2i(1, 0), Vector2i(1, 1), Vector2i(0, 1), Vector2i(0, 2)],
+	[Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1), Vector2i(1, 2)],
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(0, 2)],
 ]
 
@@ -46,7 +51,7 @@ var high_score := 0
 var gold_amount := 100
 var master_volume := 1.0
 var current_lang := "tr" # "tr" veya "en"
-var high_score_broken_this_game := false # 🏆 REKOR KINILDI MI TAKİBİ
+var high_score_broken_this_game := false
 const SAVE_PATH: String = "user://save_data.cfg"
 
 # ELDEKİ JOKER ADETLERİ
@@ -73,7 +78,7 @@ var revive_btn: Button
 const COST_HAMMER := 50
 const COST_BOMB := 120
 const COST_REROLL := 75
-const COST_REVIVE := 500 # 👈 500 Altına Güncellendi
+const COST_REVIVE := 500
 
 enum JokerType { NONE, HAMMER, BOMB }
 var active_joker := JokerType.NONE
@@ -127,7 +132,7 @@ var settings_card: Panel
 
 var studio_name_text := "BONET GAMES"
 
-# 🌐 ÇEVİRİ SÖZLÜĞÜ (DICTIONARY)
+# 🌐 ÇEVİRİ SÖZLÜĞÜ
 var tr_data := {
 	"score": "Skor: %d",
 	"best": "En İyi: %d",
@@ -582,7 +587,6 @@ func _on_piece_placed(rows_cleared: int, cols_cleared: int, cells_placed: int) -
 	score_label.text = t("score") % score
 	_update_quest_progress("reach_score", score, true)
 	
-	# --- REKOR KONTROLÜ VE ANLIK KUTLAMA ---
 	if score > high_score:
 		if not high_score_broken_this_game and high_score > 0:
 			high_score_broken_this_game = true
@@ -612,7 +616,7 @@ func _show_new_record_popup() -> void:
 	var pop_label = Label.new()
 	pop_label.text = "🏆 NEW RECORD! 🏆"
 	pop_label.add_theme_font_size_override("font_size", 46)
-	pop_label.add_theme_color_override("font_color", Color("f1c40f")) # Altın Sarı
+	pop_label.add_theme_color_override("font_color", Color("f1c40f"))
 	pop_label.add_theme_color_override("font_outline_color", Color("000000"))
 	pop_label.add_theme_constant_override("outline_size", 8)
 	
@@ -1173,7 +1177,6 @@ func _build_settings_panel() -> void:
 	volume_slider.value_changed.connect(_on_volume_changed)
 	settings_card.add_child(volume_slider)
 
-	# DİL SEÇİMİ BÖLÜMÜ
 	lang_label = Label.new()
 	lang_label.add_theme_font_size_override("font_size", 22)
 	lang_label.add_theme_color_override("font_color", Color("f1c40f"))
@@ -1386,6 +1389,7 @@ func _build_game_over_panel() -> void:
 	game_over_restart_btn.add_theme_stylebox_override("pressed", btn_style)
 	game_over_panel.add_child(game_over_restart_btn)
 
+# --- GARANTİ KOLAY PARÇA SİSTEMLİ TEPSİ OLUŞTURMA ---
 func _new_tray() -> void:
 	for p in tray:
 		if is_instance_valid(p):
@@ -1393,8 +1397,21 @@ func _new_tray() -> void:
 	tray.clear()
 
 	var slot_width = 720 / 3
+	var easy_slot_index = randi() % 3 # 3 slot arasından rastgele 1 tanesini garanti kolay yapıyoruz
+	
 	for i in range(3):
-		var shape = shapes[randi() % shapes.size()]
+		var shape: Array
+		
+		# Eğer bu slot garanti kolaysa kolay havuzdan seç, değilse genel havuzdan seç
+		if i == easy_slot_index:
+			shape = easy_shapes[randi() % easy_shapes.size()]
+		else:
+			# %40 şansla yine kolay gelebilir, %60 zor
+			if randf() < 0.4:
+				shape = easy_shapes[randi() % easy_shapes.size()]
+			else:
+				shape = hard_shapes[randi() % hard_shapes.size()]
+				
 		var color = colors[randi() % colors.size()]
 		var pv = PieceView.new()
 		pv.setup(shape, color)
@@ -1437,7 +1454,7 @@ func _on_restart() -> void:
 	score = 0
 	combo_count = 0
 	streak_count = 0
-	high_score_broken_this_game = false # 🏆 Rekor takibi yeni elde sıfırlanır
+	high_score_broken_this_game = false
 	active_joker = JokerType.NONE
 	_update_joker_buttons_visual()
 	combo_timer.stop()
