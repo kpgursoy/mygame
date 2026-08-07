@@ -1,32 +1,27 @@
 extends Control
 
-# --- KOLAY / KÜÇÜK PARÇALAR (Garanti gelme ihtimali olanlar) ---
+# --- KOLAY / KÜÇÜK PARÇALAR ---
 var easy_shapes: Array = [
-	[Vector2i(0, 0)], # 1x1 Tekli
-	[Vector2i(0, 0), Vector2i(1, 0)], # 2x1 Yatay
-	[Vector2i(0, 0), Vector2i(0, 1)], # 1x2 Dikey
-	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)], # 2x2 Kare
-	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1)], # Küçük L
+	[Vector2i(0, 0)],
+	[Vector2i(0, 0), Vector2i(1, 0)],
+	[Vector2i(0, 0), Vector2i(0, 1)],
+	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1)],
+	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1)],
 ]
 
 # --- ZOR / BÜYÜK PARÇALAR ---
 var hard_shapes: Array = [
-	# 3'lü ve 4'lü Çizgiler
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0)],
 	[Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2)],
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(3, 0)],
 	[Vector2i(0, 0), Vector2i(0, 1), Vector2i(0, 2), Vector2i(0, 3)],
-	
-	# Dikdörtgenler ve Dev Kareler
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(0, 2), Vector2i(1, 2)],
 	[
 		Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0),
 		Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1),
 		Vector2i(0, 2), Vector2i(1, 2), Vector2i(2, 2)
-	], # 3x3 Dev Kare
-	
-	# L, J VE T Şekilleri
+	],
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(0, 1)],
 	[Vector2i(0, 0), Vector2i(1, 0), Vector2i(2, 0), Vector2i(2, 1)],
 	[Vector2i(0, 0), Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1)],
@@ -50,7 +45,7 @@ var score := 0
 var high_score := 0
 var gold_amount := 100
 var master_volume := 1.0
-var current_lang := "tr" # "tr" veya "en"
+var current_lang := "tr"
 var high_score_broken_this_game := false
 const SAVE_PATH: String = "user://save_data.cfg"
 
@@ -59,7 +54,7 @@ var hammer_count := 3
 var bomb_count := 1
 var reroll_count := 2
 
-# KOMBO VE STREAK SİSTEMİ
+# KOMBO SİSTEMİ
 var combo_count := 0
 var streak_count := 0
 var combo_timer: Timer
@@ -74,11 +69,11 @@ var final_score_label: Label
 var splash_panel: ColorRect
 var revive_btn: Button
 
-# JOKER FİYATLARI VE SİSTEMİ
-const COST_HAMMER := 50
-const COST_BOMB := 120
-const COST_REROLL := 75
-const COST_REVIVE := 500
+# JOKER FİYATLARI
+const COST_HAMMER := 200
+const COST_BOMB := 300
+const COST_REROLL := 150
+const COST_REVIVE := 800
 
 enum JokerType { NONE, HAMMER, BOMB }
 var active_joker := JokerType.NONE
@@ -87,7 +82,6 @@ var hammer_btn: Button
 var bomb_btn: Button
 var reroll_btn: Button
 
-# BEYAZ ROZET SAYAC ETİKETLERİ
 var hammer_badge: Label
 var bomb_badge: Label
 var reroll_badge: Label
@@ -96,8 +90,16 @@ var reroll_badge: Label
 var start_menu_panel: Control
 var menu_best_label: Label
 var start_play_btn: Button
+var start_shop_btn: Button
 var start_quests_btn: Button
 var start_settings_btn: Button
+
+# MAĞAZA BİLEŞENLERİ
+var shop_panel: Control
+var shop_panel_title: Label
+var shop_panel_close_btn: Button
+var shop_item_container: VBoxContainer
+var shop_gold_label: Label # 🪙 MAĞAZA İÇİ ALTIN ETİKETİ
 
 var settings_panel: Control
 var settings_title_label: Label
@@ -111,19 +113,16 @@ var in_game_settings_btn: Button
 var in_game_quests_btn: Button
 var in_game_help_btn: Button
 
-# GÜNLÜK GÖREV SİSTEMİ
 var last_quest_date := ""
 var daily_quests := []
 var quest_list_container: VBoxContainer
 var quests_panel_title: Label
 var quests_panel_close_btn: Button
 
-# REHBER PANELİ BİLEŞENLERİ
 var help_title_label: Label
 var help_content_container: VBoxContainer
 var help_close_btn: Button
 
-# DİNAMİK BUTONLAR
 var restart_btn: Button
 var main_menu_btn: Button
 var close_settings_btn: Button
@@ -138,6 +137,7 @@ var tr_data := {
 	"best": "En İyi: %d",
 	"best_menu": "EN İYİ SKOR: %d",
 	"play": "OYNA",
+	"shop": "🛒 MAĞAZA",
 	"daily_quests": "🎯 GÜNLÜK GÖREVLER",
 	"settings": "⚙ AYARLAR",
 	"settings_title": "AYARLAR",
@@ -153,6 +153,7 @@ var tr_data := {
 	"quest_completed": "🎯 GÖREV TAMAMLANDI!",
 	"quest_done": "TAMAMLANDI",
 	"claim": "AL (+%d🪙)",
+	"buy": "SATIN AL",
 	"h_aim_t": "🎮 TEMEL AMAÇ",
 	"h_aim_d": "Aşağıdaki parçaları ızgaraya sürükle. Yatay veya dikey hatları tamamen doldurarak patlat ve puan topla!",
 	"h_hammer_t": "🔨 ÇEKİÇ JOKERİ (%d🪙)",
@@ -173,6 +174,7 @@ var en_data := {
 	"best": "Best: %d",
 	"best_menu": "BEST SCORE: %d",
 	"play": "PLAY",
+	"shop": "🛒 SHOP",
 	"daily_quests": "🎯 DAILY QUESTS",
 	"settings": "⚙ SETTINGS",
 	"settings_title": "SETTINGS",
@@ -188,6 +190,7 @@ var en_data := {
 	"quest_completed": "🎯 QUEST COMPLETED!",
 	"quest_done": "COMPLETED",
 	"claim": "CLAIM (+%d🪙)",
+	"buy": "BUY",
 	"h_aim_t": "🎮 MAIN OBJECTIVE",
 	"h_aim_d": "Drag the shapes into the grid. Clear vertical or horizontal lines to score points!",
 	"h_hammer_t": "🔨 HAMMER JOKER (%d🪙)",
@@ -236,7 +239,6 @@ func _ready() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(title)
 
-	# SAĞ ÜST İKON BUTONLARI
 	in_game_settings_btn = _create_icon_button("⚙", Vector2(640, 20))
 	in_game_settings_btn.pressed.connect(func(): _open_settings(true))
 	add_child(in_game_settings_btn)
@@ -249,7 +251,6 @@ func _ready() -> void:
 	in_game_help_btn.pressed.connect(func(): help_panel.visible = true)
 	add_child(in_game_help_btn)
 
-	# SKOR, REKOR VE ALTIN PANELLERİ
 	score_label = Label.new()
 	score_label.add_theme_font_size_override("font_size", 24)
 	score_label.add_theme_color_override("font_color", Color("e0e0e0"))
@@ -300,6 +301,14 @@ func _ready() -> void:
 	add_child(start_menu_panel)
 	_build_start_menu_panel()
 
+	shop_panel = Control.new()
+	shop_panel.anchor_right = 1.0
+	shop_panel.anchor_bottom = 1.0
+	shop_panel.z_index = 165
+	shop_panel.visible = false
+	add_child(shop_panel)
+	_build_shop_panel()
+
 	settings_panel = Control.new()
 	settings_panel.anchor_right = 1.0
 	settings_panel.anchor_bottom = 1.0
@@ -333,8 +342,13 @@ func _update_all_ui_texts() -> void:
 	
 	if menu_best_label: menu_best_label.text = t("best_menu") % high_score
 	if start_play_btn: start_play_btn.text = t("play")
+	if start_shop_btn: start_shop_btn.text = t("shop")
 	if start_quests_btn: start_quests_btn.text = t("daily_quests")
 	if start_settings_btn: start_settings_btn.text = t("settings")
+	
+	if shop_panel_title: shop_panel_title.text = t("shop")
+	if shop_panel_close_btn: shop_panel_close_btn.text = t("close")
+	if shop_gold_label: shop_gold_label.text = "🪙 %d" % gold_amount
 	
 	if settings_title_label: settings_title_label.text = t("settings_title")
 	if volume_label: volume_label.text = t("volume") % int(master_volume * 100)
@@ -356,6 +370,7 @@ func _update_all_ui_texts() -> void:
 	
 	_refresh_help_panel_content()
 	_refresh_quests_ui()
+	_refresh_shop_ui()
 
 func _create_icon_button(icon_text: String, pos: Vector2) -> Button:
 	var btn = Button.new()
@@ -491,6 +506,7 @@ func _try_buy_joker(type: JokerType) -> void:
 		
 		_update_gold_display()
 		_update_joker_labels()
+		_refresh_shop_ui()
 		save_save_data()
 		Input.vibrate_handheld(100)
 	else:
@@ -679,6 +695,138 @@ func save_save_data() -> void:
 	config.set_value("quests", "last_quest_date", last_quest_date)
 	config.set_value("quests", "daily_quests", daily_quests)
 	config.save(SAVE_PATH)
+
+# --- 🛒 MAĞAZA (SHOP) PANELİ BİLEŞENİ ---
+func _build_shop_panel() -> void:
+	var dim = ColorRect.new()
+	dim.color = Color(0, 0, 0, 0.82)
+	dim.anchor_right = 1.0
+	dim.anchor_bottom = 1.0
+	shop_panel.add_child(dim)
+
+	var card = Panel.new()
+	card.position = Vector2(60, 200)
+	card.custom_minimum_size = Vector2(600, 620)
+	
+	var card_style = StyleBoxFlat.new()
+	card_style.bg_color = Color("222338")
+	card_style.corner_radius_top_left = 30
+	card_style.corner_radius_top_right = 30
+	card_style.corner_radius_bottom_left = 30
+	card_style.corner_radius_bottom_right = 30
+	card_style.border_width_left = 3
+	card_style.border_width_top = 3
+	card_style.border_width_right = 3
+	card_style.border_width_bottom = 3
+	card_style.border_color = Color("8e44ad")
+	card.add_theme_stylebox_override("panel", card_style)
+	shop_panel.add_child(card)
+
+	shop_panel_title = Label.new()
+	shop_panel_title.add_theme_font_size_override("font_size", 34)
+	shop_panel_title.add_theme_color_override("font_color", Color("ffffff"))
+	shop_panel_title.position = Vector2(40, 25)
+	shop_panel_title.size = Vector2(250, 50)
+	shop_panel_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(shop_panel_title)
+
+	# 🪙 MAĞAZA KARTININ SAĞ ÜST KÖŞESİNE ALTIN GÖSTERGESİ EKLENDİ!
+	shop_gold_label = Label.new()
+	shop_gold_label.text = "🪙 %d" % gold_amount
+	shop_gold_label.add_theme_font_size_override("font_size", 28)
+	shop_gold_label.add_theme_color_override("font_color", Color("f1c40f"))
+	shop_gold_label.position = Vector2(350, 25)
+	shop_gold_label.size = Vector2(210, 50)
+	shop_gold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	shop_gold_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	card.add_child(shop_gold_label)
+
+	shop_item_container = VBoxContainer.new()
+	shop_item_container.position = Vector2(40, 95)
+	shop_item_container.custom_minimum_size = Vector2(520, 430)
+	shop_item_container.add_theme_constant_override("separation", 20)
+	card.add_child(shop_item_container)
+
+	shop_panel_close_btn = Button.new()
+	shop_panel_close_btn.position = Vector2(200, 540)
+	shop_panel_close_btn.custom_minimum_size = Vector2(200, 50)
+	shop_panel_close_btn.add_theme_font_size_override("font_size", 22)
+	shop_panel_close_btn.add_theme_color_override("font_color", Color("ffffff"))
+	shop_panel_close_btn.pressed.connect(func(): shop_panel.visible = false)
+
+	var close_style = StyleBoxFlat.new()
+	close_style.bg_color = Color("2ed573")
+	close_style.corner_radius_top_left = 16
+	close_style.corner_radius_top_right = 16
+	close_style.corner_radius_bottom_left = 16
+	close_style.corner_radius_bottom_right = 16
+	shop_panel_close_btn.add_theme_stylebox_override("normal", close_style)
+	shop_panel_close_btn.add_theme_stylebox_override("hover", close_style)
+	shop_panel_close_btn.add_theme_stylebox_override("pressed", close_style)
+	card.add_child(shop_panel_close_btn)
+
+	_refresh_shop_ui()
+
+func _refresh_shop_ui() -> void:
+	if shop_gold_label:
+		shop_gold_label.text = "🪙 %d" % gold_amount
+		
+	if not shop_item_container: return
+	for child in shop_item_container.get_children(): child.queue_free()
+
+	_add_shop_item(shop_item_container, "🔨 Hammer Pack (+1)", COST_HAMMER, hammer_count, JokerType.HAMMER)
+	_add_shop_item(shop_item_container, "💣 Bomb Pack (+1)", COST_BOMB, bomb_count, JokerType.BOMB)
+	_add_shop_item(shop_item_container, "🔄 Reroll Pack (+1)", COST_REROLL, reroll_count, JokerType.NONE)
+
+func _add_shop_item(container: VBoxContainer, item_title: String, cost: int, owned_count: int, type: JokerType) -> void:
+	var row = Panel.new()
+	row.custom_minimum_size = Vector2(520, 110)
+	
+	var r_style = StyleBoxFlat.new()
+	r_style.bg_color = Color("1a1a2e")
+	r_style.corner_radius_top_left = 16
+	r_style.corner_radius_top_right = 16
+	r_style.corner_radius_bottom_left = 16
+	r_style.corner_radius_bottom_right = 16
+	row.add_theme_stylebox_override("panel", r_style)
+
+	var title_lbl = Label.new()
+	title_lbl.text = item_title
+	title_lbl.add_theme_font_size_override("font_size", 22)
+	title_lbl.add_theme_color_override("font_color", Color("ffffff"))
+	title_lbl.position = Vector2(20, 20)
+	row.add_child(title_lbl)
+
+	var owned_lbl = Label.new()
+	owned_lbl.text = "Adet: %d" % owned_count if current_lang == "tr" else "Owned: %d" % owned_count
+	owned_lbl.add_theme_font_size_override("font_size", 18)
+	owned_lbl.add_theme_color_override("font_color", Color("aaaaff"))
+	owned_lbl.position = Vector2(20, 58)
+	row.add_child(owned_lbl)
+
+	var buy_btn = Button.new()
+	buy_btn.position = Vector2(330, 25)
+	buy_btn.custom_minimum_size = Vector2(170, 60)
+	buy_btn.text = "%d🪙" % cost
+	buy_btn.add_theme_font_size_override("font_size", 20)
+	buy_btn.add_theme_color_override("font_color", Color("000000"))
+	buy_btn.pressed.connect(func(): _try_buy_joker(type))
+
+	var btn_style = StyleBoxFlat.new()
+	btn_style.bg_color = Color("f1c40f")
+	btn_style.corner_radius_top_left = 14
+	btn_style.corner_radius_top_right = 14
+	btn_style.corner_radius_bottom_left = 14
+	btn_style.corner_radius_bottom_right = 14
+	btn_style.border_width_bottom = 4
+	btn_style.border_color = Color("d4ac0d")
+
+	buy_btn.add_theme_stylebox_override("normal", btn_style)
+	buy_btn.add_theme_stylebox_override("hover", btn_style)
+	buy_btn.add_theme_stylebox_override("pressed", btn_style)
+	row.add_child(buy_btn)
+
+	container.add_child(row)
 
 func _build_help_panel() -> void:
 	var dim = ColorRect.new()
@@ -977,9 +1125,16 @@ func _show_not_enough_gold_anim() -> void:
 	var tween = create_tween()
 	tween.tween_property(gold_label, "modulate", Color.RED, 0.15)
 	tween.tween_property(gold_label, "modulate", Color.WHITE, 0.15)
+	
+	if shop_gold_label:
+		var shop_tween = create_tween()
+		shop_tween.tween_property(shop_gold_label, "modulate", Color.RED, 0.15)
+		shop_tween.tween_property(shop_gold_label, "modulate", Color.WHITE, 0.15)
 
 func _update_gold_display() -> void:
 	gold_label.text = "🪙 %d" % gold_amount
+	if shop_gold_label:
+		shop_gold_label.text = "🪙 %d" % gold_amount
 
 func _show_splash_screen() -> void:
 	splash_panel = ColorRect.new()
@@ -1039,6 +1194,7 @@ func _show_combo_popup(text: String, spawn_pos: Vector2, is_streak: bool = false
 	tween.tween_property(pop_label, "modulate:a", 0.0, 0.65).set_ease(Tween.EASE_IN)
 	tween.chain().tween_callback(pop_label.queue_free)
 
+# --- 🏠 ANA MENÜ BİLEŞENİ ---
 func _build_start_menu_panel() -> void:
 	var dim = ColorRect.new()
 	dim.color = Color("1a1a2e")
@@ -1050,7 +1206,7 @@ func _build_start_menu_panel() -> void:
 	title_label.text = "BLOCK BLAST"
 	title_label.add_theme_font_size_override("font_size", 54)
 	title_label.add_theme_color_override("font_color", Color("ffffff"))
-	title_label.position = Vector2(0, 320)
+	title_label.position = Vector2(0, 260)
 	title_label.size = Vector2(720, 70)
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	start_menu_panel.add_child(title_label)
@@ -1058,24 +1214,24 @@ func _build_start_menu_panel() -> void:
 	menu_best_label = Label.new()
 	menu_best_label.add_theme_font_size_override("font_size", 32)
 	menu_best_label.add_theme_color_override("font_color", Color("f1c40f"))
-	menu_best_label.position = Vector2(0, 400)
+	menu_best_label.position = Vector2(0, 335)
 	menu_best_label.size = Vector2(720, 50)
 	menu_best_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	start_menu_panel.add_child(menu_best_label)
 
 	start_play_btn = Button.new()
-	start_play_btn.position = Vector2(210, 490)
-	start_play_btn.custom_minimum_size = Vector2(300, 80)
-	start_play_btn.add_theme_font_size_override("font_size", 36)
+	start_play_btn.position = Vector2(210, 420)
+	start_play_btn.custom_minimum_size = Vector2(300, 75)
+	start_play_btn.add_theme_font_size_override("font_size", 34)
 	start_play_btn.add_theme_color_override("font_color", Color("ffffff"))
 	start_play_btn.pressed.connect(_on_start_game_pressed)
 	
 	var btn_style = StyleBoxFlat.new()
 	btn_style.bg_color = Color("2ed573")
-	btn_style.corner_radius_top_left = 25
-	btn_style.corner_radius_top_right = 25
-	btn_style.corner_radius_bottom_left = 25
-	btn_style.corner_radius_bottom_right = 25
+	btn_style.corner_radius_top_left = 22
+	btn_style.corner_radius_top_right = 22
+	btn_style.corner_radius_bottom_left = 22
+	btn_style.corner_radius_bottom_right = 22
 	btn_style.border_width_bottom = 8
 	btn_style.border_color = Color("26af5f")
 
@@ -1084,19 +1240,40 @@ func _build_start_menu_panel() -> void:
 	start_play_btn.add_theme_stylebox_override("pressed", btn_style)
 	start_menu_panel.add_child(start_play_btn)
 
+	start_shop_btn = Button.new()
+	start_shop_btn.position = Vector2(210, 515)
+	start_shop_btn.custom_minimum_size = Vector2(300, 60)
+	start_shop_btn.add_theme_font_size_override("font_size", 22)
+	start_shop_btn.add_theme_color_override("font_color", Color("ffffff"))
+	start_shop_btn.pressed.connect(func(): shop_panel.visible = true)
+
+	var shop_style = StyleBoxFlat.new()
+	shop_style.bg_color = Color("8e44ad")
+	shop_style.corner_radius_top_left = 18
+	shop_style.corner_radius_top_right = 18
+	shop_style.corner_radius_bottom_left = 18
+	shop_style.corner_radius_bottom_right = 18
+	shop_style.border_width_bottom = 5
+	shop_style.border_color = Color("71368a")
+
+	start_shop_btn.add_theme_stylebox_override("normal", shop_style)
+	start_shop_btn.add_theme_stylebox_override("hover", shop_style)
+	start_shop_btn.add_theme_stylebox_override("pressed", shop_style)
+	start_menu_panel.add_child(start_shop_btn)
+
 	start_quests_btn = Button.new()
-	start_quests_btn.position = Vector2(210, 595)
-	start_quests_btn.custom_minimum_size = Vector2(300, 65)
+	start_quests_btn.position = Vector2(210, 590)
+	start_quests_btn.custom_minimum_size = Vector2(300, 60)
 	start_quests_btn.add_theme_font_size_override("font_size", 22)
 	start_quests_btn.add_theme_color_override("font_color", Color("ffffff"))
 	start_quests_btn.pressed.connect(func(): quests_panel.visible = true)
 
 	var q_style = StyleBoxFlat.new()
 	q_style.bg_color = Color("e67e22")
-	q_style.corner_radius_top_left = 20
-	q_style.corner_radius_top_right = 20
-	q_style.corner_radius_bottom_left = 20
-	q_style.corner_radius_bottom_right = 20
+	q_style.corner_radius_top_left = 18
+	q_style.corner_radius_top_right = 18
+	q_style.corner_radius_bottom_left = 18
+	q_style.corner_radius_bottom_right = 18
 	q_style.border_width_bottom = 5
 	q_style.border_color = Color("d35400")
 
@@ -1106,18 +1283,18 @@ func _build_start_menu_panel() -> void:
 	start_menu_panel.add_child(start_quests_btn)
 
 	start_settings_btn = Button.new()
-	start_settings_btn.position = Vector2(240, 680)
-	start_settings_btn.custom_minimum_size = Vector2(240, 60)
-	start_settings_btn.add_theme_font_size_override("font_size", 24)
+	start_settings_btn.position = Vector2(240, 665)
+	start_settings_btn.custom_minimum_size = Vector2(240, 55)
+	start_settings_btn.add_theme_font_size_override("font_size", 22)
 	start_settings_btn.add_theme_color_override("font_color", Color("ffffff"))
 	start_settings_btn.pressed.connect(func(): _open_settings(false))
 
 	var set_style = StyleBoxFlat.new()
 	set_style.bg_color = Color("3a3b5c")
-	set_style.corner_radius_top_left = 20
-	set_style.corner_radius_top_right = 20
-	set_style.corner_radius_bottom_left = 20
-	set_style.corner_radius_bottom_right = 20
+	set_style.corner_radius_top_left = 18
+	set_style.corner_radius_top_right = 18
+	set_style.corner_radius_bottom_left = 18
+	set_style.corner_radius_bottom_right = 18
 	set_style.border_width_bottom = 5
 	set_style.border_color = Color("2d2e47")
 
@@ -1389,7 +1566,6 @@ func _build_game_over_panel() -> void:
 	game_over_restart_btn.add_theme_stylebox_override("pressed", btn_style)
 	game_over_panel.add_child(game_over_restart_btn)
 
-# --- GARANTİ KOLAY PARÇA SİSTEMLİ TEPSİ OLUŞTURMA ---
 func _new_tray() -> void:
 	for p in tray:
 		if is_instance_valid(p):
@@ -1397,16 +1573,13 @@ func _new_tray() -> void:
 	tray.clear()
 
 	var slot_width = 720 / 3
-	var easy_slot_index = randi() % 3 # 3 slot arasından rastgele 1 tanesini garanti kolay yapıyoruz
+	var easy_slot_index = randi() % 3
 	
 	for i in range(3):
 		var shape: Array
-		
-		# Eğer bu slot garanti kolaysa kolay havuzdan seç, değilse genel havuzdan seç
 		if i == easy_slot_index:
 			shape = easy_shapes[randi() % easy_shapes.size()]
 		else:
-			# %40 şansla yine kolay gelebilir, %60 zor
 			if randf() < 0.4:
 				shape = easy_shapes[randi() % easy_shapes.size()]
 			else:
