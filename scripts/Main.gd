@@ -69,11 +69,11 @@ var final_score_label: Label
 var splash_panel: ColorRect
 var revive_btn: Button
 
-# JOKER FİYATLARI
-const COST_HAMMER := 200
-const COST_BOMB := 300
-const COST_REROLL := 150
-const COST_REVIVE := 800
+# JOKER FİYATLARI VE DİNAMİK DEVAM ET MALİYETİ
+var COST_HAMMER := 150
+var COST_BOMB := 350
+var COST_REROLL := 200
+var current_revive_cost := 800  # 🔄 Her kullanımda artacak değişken maliyet
 
 enum JokerType { NONE, HAMMER, BOMB }
 var active_joker := JokerType.NONE
@@ -99,7 +99,7 @@ var shop_panel: Control
 var shop_panel_title: Label
 var shop_panel_close_btn: Button
 var shop_item_container: VBoxContainer
-var shop_gold_label: Label # 🪙 MAĞAZA İÇİ ALTIN ETİKETİ
+var shop_gold_label: Label
 
 var settings_panel: Control
 var settings_title_label: Label
@@ -153,7 +153,10 @@ var tr_data := {
 	"quest_completed": "🎯 GÖREV TAMAMLANDI!",
 	"quest_done": "TAMAMLANDI",
 	"claim": "AL (+%d🪙)",
-	"buy": "SATIN AL",
+	"owned": "Adet: %d",
+	"shop_hammer": "🔨 Çekiç Paketi (+1)",
+	"shop_bomb": "💣 Bomba Paketi (+1)",
+	"shop_reroll": "🔄 Yenile Paketi (+1)",
 	"h_aim_t": "🎮 TEMEL AMAÇ",
 	"h_aim_d": "Aşağıdaki parçaları ızgaraya sürükle. Yatay veya dikey hatları tamamen doldurarak patlat ve puan topla!",
 	"h_hammer_t": "🔨 ÇEKİÇ JOKERİ (%d🪙)",
@@ -190,7 +193,10 @@ var en_data := {
 	"quest_completed": "🎯 QUEST COMPLETED!",
 	"quest_done": "COMPLETED",
 	"claim": "CLAIM (+%d🪙)",
-	"buy": "BUY",
+	"owned": "Owned: %d",
+	"shop_hammer": "🔨 Hammer Pack (+1)",
+	"shop_bomb": "💣 Bomb Pack (+1)",
+	"shop_reroll": "🔄 Reroll Pack (+1)",
 	"h_aim_t": "🎮 MAIN OBJECTIVE",
 	"h_aim_d": "Drag the shapes into the grid. Clear vertical or horizontal lines to score points!",
 	"h_hammer_t": "🔨 HAMMER JOKER (%d🪙)",
@@ -360,7 +366,7 @@ func _update_all_ui_texts() -> void:
 	
 	if game_over_title_label: game_over_title_label.text = t("game_over")
 	if final_score_label: final_score_label.text = t("score") % score
-	if revive_btn: revive_btn.text = t("continue") % COST_REVIVE
+	if revive_btn: revive_btn.text = t("continue") % current_revive_cost
 	if game_over_restart_btn: game_over_restart_btn.text = t("restart")
 	
 	if quests_panel_title: quests_panel_title.text = t("daily_quests")
@@ -730,7 +736,6 @@ func _build_shop_panel() -> void:
 	shop_panel_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	card.add_child(shop_panel_title)
 
-	# 🪙 MAĞAZA KARTININ SAĞ ÜST KÖŞESİNE ALTIN GÖSTERGESİ EKLENDİ!
 	shop_gold_label = Label.new()
 	shop_gold_label.text = "🪙 %d" % gold_amount
 	shop_gold_label.add_theme_font_size_override("font_size", 28)
@@ -774,9 +779,9 @@ func _refresh_shop_ui() -> void:
 	if not shop_item_container: return
 	for child in shop_item_container.get_children(): child.queue_free()
 
-	_add_shop_item(shop_item_container, "🔨 Hammer Pack (+1)", COST_HAMMER, hammer_count, JokerType.HAMMER)
-	_add_shop_item(shop_item_container, "💣 Bomb Pack (+1)", COST_BOMB, bomb_count, JokerType.BOMB)
-	_add_shop_item(shop_item_container, "🔄 Reroll Pack (+1)", COST_REROLL, reroll_count, JokerType.NONE)
+	_add_shop_item(shop_item_container, t("shop_hammer"), COST_HAMMER, hammer_count, JokerType.HAMMER)
+	_add_shop_item(shop_item_container, t("shop_bomb"), COST_BOMB, bomb_count, JokerType.BOMB)
+	_add_shop_item(shop_item_container, t("shop_reroll"), COST_REROLL, reroll_count, JokerType.NONE)
 
 func _add_shop_item(container: VBoxContainer, item_title: String, cost: int, owned_count: int, type: JokerType) -> void:
 	var row = Panel.new()
@@ -798,7 +803,7 @@ func _add_shop_item(container: VBoxContainer, item_title: String, cost: int, own
 	row.add_child(title_lbl)
 
 	var owned_lbl = Label.new()
-	owned_lbl.text = "Adet: %d" % owned_count if current_lang == "tr" else "Owned: %d" % owned_count
+	owned_lbl.text = t("owned") % owned_count
 	owned_lbl.add_theme_font_size_override("font_size", 18)
 	owned_lbl.add_theme_color_override("font_color", Color("aaaaff"))
 	owned_lbl.position = Vector2(20, 58)
@@ -1608,13 +1613,24 @@ func _check_game_over() -> void:
 func _show_game_over() -> void:
 	combo_timer.stop()
 	final_score_label.text = t("score") % score
-	revive_btn.visible = gold_amount >= COST_REVIVE
+	revive_btn.text = t("continue") % current_revive_cost # 👈 Buton yazısı güncel maliyetle yenilenir
+	revive_btn.visible = gold_amount >= current_revive_cost
 	game_over_panel.visible = true
 
+# 🔄 ARTAN DEVAM ET (REVIVE) MANTIĞI
 func _on_revive_pressed() -> void:
-	if gold_amount >= COST_REVIVE:
-		gold_amount -= COST_REVIVE
+	if gold_amount >= current_revive_cost:
+		gold_amount -= current_revive_cost
 		_update_gold_display()
+
+		# Kademeli maliyet artışı (800 -> 2000 -> 3000 -> +1000)
+		if current_revive_cost == 800:
+			current_revive_cost = 2000
+		elif current_revive_cost == 2000:
+			current_revive_cost = 3000
+		else:
+			current_revive_cost += 1000
+
 		save_save_data()
 		
 		grid.use_bomb(Vector2i(3, 3))
@@ -1627,6 +1643,7 @@ func _on_restart() -> void:
 	score = 0
 	combo_count = 0
 	streak_count = 0
+	current_revive_cost = 800 # 🏆 Yeni maç başladığında maliyet tekrar 800'e sıfırlanır!
 	high_score_broken_this_game = false
 	active_joker = JokerType.NONE
 	_update_joker_buttons_visual()
