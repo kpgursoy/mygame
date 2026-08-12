@@ -1,2 +1,35 @@
+# Godot generated files
 .godot/
-*.import
+.import/
+
+# Android generated files
+android/build/
+android/.gradle/
+android/local.properties/
+
+# Build / export output
+build/
+export/
+
+# IDE
+.vscode/
+.idea/
+.vs/
+
+# C# / .NET generated files
+bin/
+obj/
+.mono/
+*.csproj
+*.sln
+*.suo
+*.user
+*.userprefs
+
+# Logs / temporary files
+*.log
+*.tmp
+
+# OS generated files
+.DS_Store
+Thumbs.db
