@@ -14,6 +14,9 @@ var hover_color := Color.WHITE
 
 var last_hover_anchor := Vector2i(-999, -999) 
 
+# === YENİ: Patlayacak hücreleri tutacağımız liste ===
+var preview_clear_cells: Array = [] 
+
 func _ready() -> void:
 	custom_minimum_size = Vector2(GRID_SIZE * cell_size, GRID_SIZE * cell_size)
 	size = custom_minimum_size
@@ -27,6 +30,11 @@ func _ready() -> void:
 	_init_board()
 	mouse_exited.connect(_on_mouse_exited)
 
+# === YENİ: Animasyonun akıcı olması için ekranı yenileme ===
+func _process(_delta: float) -> void:
+	if preview_clear_cells.size() > 0:
+		queue_redraw()
+
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var col = int(event.position.x / cell_size)
@@ -36,6 +44,7 @@ func _gui_input(event: InputEvent) -> void:
 
 func _on_mouse_exited() -> void:
 	hover_cells.clear()
+	preview_clear_cells.clear() # Temizlik
 	last_hover_anchor = Vector2i(-999, -999)
 	queue_redraw()
 
@@ -51,6 +60,7 @@ func _init_board() -> void:
 func reset_board() -> void:
 	_init_board()
 	hover_cells = []
+	preview_clear_cells.clear() # Temizlik
 	last_hover_anchor = Vector2i(-999, -999)
 	queue_redraw()
 
@@ -75,6 +85,38 @@ func _draw() -> void:
 			if in_bounds(cell.x, cell.y):
 				var r = Rect2(cell.x * cell_size + 1, cell.y * cell_size + 1, cell_size - 3, cell_size - 3)
 				_draw_styled_block(r, hc)
+
+	# === YENİ: ANİMASYONLU PARLAMA ÇİZİMİ ===
+	if preview_clear_cells.size() > 0:
+		# Zamanı alıp sinüs dalgasına çeviriyoruz (Nefes alma efekti)
+		var time = Time.get_ticks_msec() / 150.0 
+		var pulse = (sin(time) + 1.0) / 2.0 # 0.0 ile 1.0 arası yumuşak geçiş
+		
+		# Saydamlığı nabız gibi attır (0.15 ile 0.55 arasında gidip gelir)
+		var current_alpha = 0.15 + (pulse * 0.40)
+		var glow_color = Color(1.0, 1.0, 1.0, current_alpha) 
+		var border_color = Color(1.0, 1.0, 1.0, current_alpha + 0.3) 
+		
+		for cell in preview_clear_cells:
+			if in_bounds(cell.x, cell.y):
+				var r = Rect2(cell.x * cell_size + 1, cell.y * cell_size + 1, cell_size - 3, cell_size - 3)
+				var style = StyleBoxFlat.new()
+				
+				style.bg_color = glow_color
+				
+				style.border_width_top = 2
+				style.border_width_left = 2
+				style.border_width_bottom = 2
+				style.border_width_right = 2
+				style.border_color = border_color
+				
+				var radius = int(r.size.x * 0.18)
+				style.corner_radius_top_left = radius
+				style.corner_radius_top_right = radius
+				style.corner_radius_bottom_left = radius
+				style.corner_radius_bottom_right = radius
+				
+				draw_style_box(style, r)
 
 func _draw_styled_block(rect: Rect2, color: Color, is_empty: bool = false) -> void:
 	var style = StyleBoxFlat.new()
@@ -288,6 +330,7 @@ func get_closest_valid_anchor(shape: Array, target_anchor: Vector2i) -> Vector2i
 func _can_drop_data(pos: Vector2, data: Variant) -> bool:
 	if typeof(data) != TYPE_DICTIONARY or not data.has("shape"):
 		hover_cells = []
+		preview_clear_cells.clear() # Temizlik
 		last_hover_anchor = Vector2i(-999, -999)
 		queue_redraw()
 		return false
@@ -301,6 +344,7 @@ func _can_drop_data(pos: Vector2, data: Variant) -> bool:
 	
 	if best_anchor == Vector2i(-999, -999):
 		hover_cells = []
+		preview_clear_cells.clear() # Temizlik
 		last_hover_anchor = Vector2i(-999, -999)
 		queue_redraw()
 		return false
@@ -316,6 +360,51 @@ func _can_drop_data(pos: Vector2, data: Variant) -> bool:
 	hover_cells = []
 	for cell in shape:
 		hover_cells.append(Vector2i(best_anchor.x + cell.x, best_anchor.y + cell.y))
+		
+	# === YENİ: SİMÜLASYON BAŞLANGICI ===
+	preview_clear_cells.clear()
+	
+	var temp_board = []
+	for y in range(GRID_SIZE):
+		temp_board.append(board[y].duplicate())
+		
+	for hc in hover_cells:
+		temp_board[hc.y][hc.x] = hover_color
+		
+	var rows_to_clear = []
+	var cols_to_clear = []
+	
+	for y in range(GRID_SIZE):
+		var full = true
+		for x in range(GRID_SIZE):
+			if temp_board[y][x] == null:
+				full = false
+				break
+		if full:
+			rows_to_clear.append(y)
+			
+	for x in range(GRID_SIZE):
+		var full = true
+		for y in range(GRID_SIZE):
+			if temp_board[y][x] == null:
+				full = false
+				break
+		if full:
+			cols_to_clear.append(x)
+			
+	for y in rows_to_clear:
+		for x in range(GRID_SIZE):
+			var cell_pos = Vector2i(x, y)
+			if not cell_pos in preview_clear_cells:
+				preview_clear_cells.append(cell_pos)
+				
+	for x in cols_to_clear:
+		for y in range(GRID_SIZE):
+			var cell_pos = Vector2i(x, y)
+			if not cell_pos in preview_clear_cells:
+				preview_clear_cells.append(cell_pos)
+	# === SİMÜLASYON BİTİŞİ ===
+
 	queue_redraw()
 	return true
 
@@ -327,6 +416,7 @@ func _drop_data(pos: Vector2, data: Variant) -> void:
 	var best_anchor = get_closest_valid_anchor(shape, raw_anchor)
 	
 	hover_cells = []
+	preview_clear_cells.clear() # Temizlik
 	last_hover_anchor = Vector2i(-999, -999)
 	
 	if best_anchor != Vector2i(-999, -999):

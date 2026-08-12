@@ -237,7 +237,7 @@ func _ready() -> void:
 	_check_and_reset_daily_quests()
 
 	var title = Label.new()
-	title.text = "BLOCK BLAST"
+	title.text = "Color Burst"
 	title.add_theme_font_size_override("font_size", 40)
 	title.add_theme_color_override("font_color", Color("f5f5f5"))
 	title.position = Vector2(0, 20)
@@ -1208,7 +1208,7 @@ func _build_start_menu_panel() -> void:
 	start_menu_panel.add_child(dim)
 
 	var title_label = Label.new()
-	title_label.text = "BLOCK BLAST"
+	title_label.text = "Color Burst"
 	title_label.add_theme_font_size_override("font_size", 54)
 	title_label.add_theme_color_override("font_color", Color("ffffff"))
 	title_label.position = Vector2(0, 260)
@@ -1651,3 +1651,6 @@ func _on_restart() -> void:
 	score_label.text = t("score") % 0
 	grid.reset_board()
 	_new_tray()
+	
+	AdManager.show_game_over_ad()
+	
