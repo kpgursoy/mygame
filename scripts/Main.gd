@@ -73,7 +73,7 @@ var revive_btn: Button
 var COST_HAMMER := 150
 var COST_BOMB := 350
 var COST_REROLL := 200
-var current_revive_cost := 800  # 🔄 Her kullanımda artacak değişken maliyet
+var current_revive_cost := 800
 
 enum JokerType { NONE, HAMMER, BOMB }
 var active_joker := JokerType.NONE
@@ -157,6 +157,7 @@ var tr_data := {
 	"shop_hammer": "🔨 Çekiç Paketi (+1)",
 	"shop_bomb": "💣 Bomba Paketi (+1)",
 	"shop_reroll": "🔄 Yenile Paketi (+1)",
+	"not_enough_gold": "⚠️ YETERSİZ ALTIN!",
 	"h_aim_t": "🎮 TEMEL AMAÇ",
 	"h_aim_d": "Aşağıdaki parçaları ızgaraya sürükle. Yatay veya dikey hatları tamamen doldurarak patlat ve puan topla!",
 	"h_hammer_t": "🔨 ÇEKİÇ JOKERİ (%d🪙)",
@@ -197,6 +198,7 @@ var en_data := {
 	"shop_hammer": "🔨 Hammer Pack (+1)",
 	"shop_bomb": "💣 Bomb Pack (+1)",
 	"shop_reroll": "🔄 Reroll Pack (+1)",
+	"not_enough_gold": "⚠️ NOT ENOUGH GOLD!",
 	"h_aim_t": "🎮 MAIN OBJECTIVE",
 	"h_aim_d": "Drag the shapes into the grid. Clear vertical or horizontal lines to score points!",
 	"h_hammer_t": "🔨 HAMMER JOKER (%d🪙)",
@@ -237,7 +239,7 @@ func _ready() -> void:
 	_check_and_reset_daily_quests()
 
 	var title = Label.new()
-	
+	title.text = "Color Burst"
 	title.add_theme_font_size_override("font_size", 40)
 	title.add_theme_color_override("font_color", Color("f5f5f5"))
 	title.position = Vector2(0, 20)
@@ -1125,8 +1127,11 @@ func _claim_quest_reward(quest: Dictionary) -> void:
 	Input.vibrate_handheld(150)
 	_refresh_quests_ui()
 
+# --- ⚠️ YETERSİZ ALTIN UYARI ANİMASYONU ---
 func _show_not_enough_gold_anim() -> void:
-	Input.vibrate_handheld(200)
+	Input.vibrate_handheld(250)
+	
+	# 1. Altın göstergesi kırmızı yanıp sönsün
 	var tween = create_tween()
 	tween.tween_property(gold_label, "modulate", Color.RED, 0.15)
 	tween.tween_property(gold_label, "modulate", Color.WHITE, 0.15)
@@ -1135,6 +1140,29 @@ func _show_not_enough_gold_anim() -> void:
 		var shop_tween = create_tween()
 		shop_tween.tween_property(shop_gold_label, "modulate", Color.RED, 0.15)
 		shop_tween.tween_property(shop_gold_label, "modulate", Color.WHITE, 0.15)
+
+	# 2. Ekranda ortada "YETERSİZ ALTIN" Pop-up'ı çıksın
+	var warn_label = Label.new()
+	warn_label.text = t("not_enough_gold")
+	warn_label.add_theme_font_size_override("font_size", 36)
+	warn_label.add_theme_color_override("font_color", Color("ff4757"))
+	warn_label.add_theme_color_override("font_outline_color", Color("000000"))
+	warn_label.add_theme_constant_override("outline_size", 6)
+	
+	warn_label.position = Vector2(0, 560)
+	warn_label.size = Vector2(720, 50)
+	warn_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	warn_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	warn_label.z_index = 250
+	warn_label.scale = Vector2(0.2, 0.2)
+	warn_label.pivot_offset = Vector2(360, 25)
+	add_child(warn_label)
+
+	var p_tween = create_tween().set_parallel(true)
+	p_tween.tween_property(warn_label, "scale", Vector2(1.1, 1.1), 0.2).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	p_tween.tween_property(warn_label, "position:y", 510.0, 0.7).set_trans(Tween.TRANS_QUAD)
+	p_tween.tween_property(warn_label, "modulate:a", 0.0, 0.7).set_ease(Tween.EASE_IN)
+	p_tween.chain().tween_callback(warn_label.queue_free)
 
 func _update_gold_display() -> void:
 	gold_label.text = "🪙 %d" % gold_amount
@@ -1613,17 +1641,17 @@ func _check_game_over() -> void:
 func _show_game_over() -> void:
 	combo_timer.stop()
 	final_score_label.text = t("score") % score
-	revive_btn.text = t("continue") % current_revive_cost # 👈 Buton yazısı güncel maliyetle yenilenir
-	revive_btn.visible = gold_amount >= current_revive_cost
+	revive_btn.text = t("continue") % current_revive_cost
+	revive_btn.visible = true
 	game_over_panel.visible = true
 
-# 🔄 ARTAN DEVAM ET (REVIVE) MANTIĞI
+# 🔄 ARTAN DEVAM ET (REVIVE) MANTIĞI & YETERSİZ ALTIN UYARISI
 func _on_revive_pressed() -> void:
 	if gold_amount >= current_revive_cost:
 		gold_amount -= current_revive_cost
 		_update_gold_display()
 
-		# Kademeli maliyet artışı (800 -> 2000 -> 3000 -> +1000)
+		# Kademeli maliyet artışı: 800 -> 2000 -> 3000 -> +1000
 		if current_revive_cost == 800:
 			current_revive_cost = 2000
 		elif current_revive_cost == 2000:
@@ -1637,13 +1665,18 @@ func _on_revive_pressed() -> void:
 		game_over_panel.visible = false
 		Input.vibrate_handheld(200)
 		_check_game_over()
+	else:
+		_show_not_enough_gold_anim()
 
 func _on_restart() -> void:
+	if typeof(AdManager) != TYPE_NIL and AdManager != null and AdManager.has_method("show_game_over_ad"):
+		AdManager.show_game_over_ad()
+
 	game_over_panel.visible = false
 	score = 0
 	combo_count = 0
 	streak_count = 0
-	current_revive_cost = 800 # 🏆 Yeni maç başladığında maliyet tekrar 800'e sıfırlanır!
+	current_revive_cost = 800
 	high_score_broken_this_game = false
 	active_joker = JokerType.NONE
 	_update_joker_buttons_visual()
@@ -1651,7 +1684,3 @@ func _on_restart() -> void:
 	score_label.text = t("score") % 0
 	grid.reset_board()
 	_new_tray()
-	
-	AdManager.show_game_over_ad()
-	
-	
