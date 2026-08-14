@@ -237,7 +237,7 @@ func _ready() -> void:
 	_check_and_reset_daily_quests()
 
 	var title = Label.new()
-	title.text = "Color Burst"
+	
 	title.add_theme_font_size_override("font_size", 40)
 	title.add_theme_color_override("font_color", Color("f5f5f5"))
 	title.position = Vector2(0, 20)
@@ -1653,4 +1653,5 @@ func _on_restart() -> void:
 	_new_tray()
 	
 	AdManager.show_game_over_ad()
+	
 	
