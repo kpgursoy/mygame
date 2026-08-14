@@ -1654,3 +1654,4 @@ func _on_restart() -> void:
 	
 	AdManager.show_game_over_ad()
 	
+	#343243534534
